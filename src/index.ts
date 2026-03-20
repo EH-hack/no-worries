@@ -85,8 +85,7 @@ async function sendGroup(groupId: string, text: string): Promise<void> {
 async function handleDM(senderUid: string, text: string): Promise<void> {
   console.log(`💬 DM  from ${senderUid}: ${text}`);
 
-  // Example: echo back
-  await sendDM(senderUid, `You said: "${text}"`);
+  await sendDM(senderUid, `🛑✋ Whoa hold up I'm in progress 🚧🔧`);
 }
 
 async function handleGroupMessage(
@@ -96,10 +95,7 @@ async function handleGroupMessage(
 ): Promise<void> {
   console.log(`👥 Group [${groupId}] from ${senderUid}: ${text}`);
 
-  // Example: reply in the group when the bot is @mentioned
-  if (text.toLowerCase().includes("hello")) {
-    await sendGroup(groupId, `👋 Hello, ${senderUid}!`);
-  }
+  await sendGroup(groupId, `🛑✋ Whoa hold up I'm in progress 🚧🔧`);
 }
 
 // ─── Poll loop ────────────────────────────────────────────────────────────────
