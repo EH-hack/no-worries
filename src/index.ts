@@ -24,6 +24,141 @@ if (!process.env.CHATGPT_API_KEY) {
   process.exit(1);
 }
 
+const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY ?? "";
+if (!GEOAPIFY_KEY) {
+  console.warn("⚠️  GEOAPIFY_KEY not set — place search will be unavailable");
+}
+
+// ─── Geoapify Places API ─────────────────────────────────────────────────────
+interface GeoapifyPlace {
+  name?: string;
+  categories: string[];
+  formatted?: string;
+  address_line1?: string;
+  address_line2?: string;
+  lat: number;
+  lon: number;
+  place_id: string;
+  distance?: number;
+}
+
+// First geocode a location name to lat/lon, then search for places nearby
+async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const res = await axios.get("https://api.geoapify.com/v1/geocode/search", {
+      params: { text: location, apiKey: GEOAPIFY_KEY, limit: 1 },
+    });
+    const feature = res.data?.features?.[0];
+    if (!feature) return null;
+    const [lon, lat] = feature.geometry.coordinates;
+    return { lat, lon };
+  } catch (err) {
+    console.error("❌ Geocode error:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function searchPlaces(
+  term: string,
+  location: string,
+  limit: number = 5
+): Promise<GeoapifyPlace[]> {
+  try {
+    // Map common search terms to Geoapify categories
+    const categoryMap: Record<string, string> = {
+      restaurant: "catering.restaurant",
+      restaurants: "catering.restaurant",
+      bar: "catering.bar",
+      bars: "catering.bar",
+      pub: "catering.pub",
+      pubs: "catering.pub",
+      club: "entertainment.club",
+      clubs: "entertainment.club",
+      nightclub: "entertainment.club.night",
+      cafe: "catering.cafe",
+      coffee: "catering.cafe",
+      food: "catering",
+      karaoke: "entertainment.karaoke",
+      pizza: "catering.restaurant",
+      burger: "catering.fast_food",
+      "fast food": "catering.fast_food",
+    };
+
+    const termLower = term.toLowerCase();
+    const category = categoryMap[termLower] ?? "catering";
+
+    const coords = await geocode(location);
+    if (!coords) return [];
+
+    const res = await axios.get("https://api.geoapify.com/v2/places", {
+      params: {
+        categories: category,
+        filter: `circle:${coords.lon},${coords.lat},2000`,
+        bias: `proximity:${coords.lon},${coords.lat}`,
+        limit,
+        apiKey: GEOAPIFY_KEY,
+      },
+    });
+
+    return (res.data?.features ?? []).map((f: any) => ({
+      ...f.properties,
+      lat: f.geometry.coordinates[1],
+      lon: f.geometry.coordinates[0],
+    }));
+  } catch (err) {
+    console.error("❌ Geoapify error:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+function formatPlaceResults(places: GeoapifyPlace[]): string {
+  if (places.length === 0) return "No places found 😕";
+  return places
+    .map((p, i) => {
+      const name = p.name ?? "Unnamed";
+      const addr = p.formatted ?? p.address_line2 ?? "";
+      const dist = p.distance ? ` · ${Math.round(p.distance)}m away` : "";
+      const cats = p.categories
+        .filter((c) => !c.startsWith("building") && !c.startsWith("commercial"))
+        .slice(0, 2)
+        .join(", ");
+      return `${i + 1}. ${name}${dist}\n   ${cats}\n   📍 ${addr}`;
+    })
+    .join("\n\n");
+}
+
+// ─── GPT Tools ───────────────────────────────────────────────────────────────
+const GPT_TOOLS: OpenAI.ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "find_places",
+      description:
+        "Search for restaurants, bars, clubs, cafes, or any venue near a location. Use this when someone asks for place recommendations or wants to plan where to go.",
+      parameters: {
+        type: "object",
+        properties: {
+          term: {
+            type: "string",
+            description:
+              'What to search for, e.g. "cocktail bars", "italian restaurant", "late night food", "karaoke"',
+          },
+          location: {
+            type: "string",
+            description:
+              'Location to search near, e.g. "Shoreditch, London", "Soho, London", "Camden"',
+          },
+          limit: {
+            type: "number",
+            description: "Number of results (1-10, default 5)",
+          },
+        },
+        required: ["term", "location"],
+      },
+    },
+  },
+];
+
 // ─── System prompt ───────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are "No Worries" 🍕 — a chill, friendly AI assistant living inside a Luffa group chat.
 
@@ -33,6 +168,8 @@ What you can do:
 - Help split bills when someone shares what people ordered or snaps a receipt
 - Keep track of who owes what
 - Help plan group activities (meeting spots, restaurants, etc.)
+- Search for nearby restaurants, bars, clubs, cafes using the find_places tool
+- Give recommendations based on what the group is in the mood for
 
 Personality:
 - Relaxed and fun — like a helpful friend in the group chat, not a corporate bot
@@ -45,6 +182,12 @@ When splitting bills:
 - Break down the split clearly
 - Include tax/tip if mentioned
 - Show each person's total
+
+When recommending places:
+- Use the find_places tool to search Yelp
+- Present results in a clean, scannable format
+- Highlight ratings, price range, and what makes each spot good
+- If the group hasn't said where they are, ask for a location
 
 Remember: you're in a group chat. Keep it snappy.`;
 
@@ -72,22 +215,80 @@ function addToHistory(
   }
 }
 
+// ─── Tool executor ───────────────────────────────────────────────────────────
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>
+): Promise<string> {
+  console.log(`🔧 Tool call: ${name}(${JSON.stringify(args)})`);
+
+  if (name === "find_places") {
+    const term = (args.term as string) ?? "restaurants";
+    const location = (args.location as string) ?? "London";
+    const limit = Math.min(Math.max((args.limit as number) ?? 5, 1), 10);
+
+    if (!GEOAPIFY_KEY) return "Place search isn't configured yet — try again later!";
+
+    const results = await searchPlaces(term, location, limit);
+    return formatPlaceResults(results);
+  }
+
+  return `Unknown tool: ${name}`;
+}
+
 // ─── GPT helper ──────────────────────────────────────────────────────────────
 async function askGPT(conversationId: string, userMessage: string): Promise<string> {
   addToHistory(conversationId, "user", userMessage);
 
   try {
-    const response = await openai.chat.completions.create({
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...getHistory(conversationId),
+    ];
+
+    let response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...getHistory(conversationId),
-      ],
+      messages,
+      tools: GPT_TOOLS,
       max_tokens: 500,
       temperature: 0.7,
     });
 
-    const reply = response.choices[0]?.message?.content ?? "Hmm, I got nothing. Try again?";
+    let choice = response.choices[0]?.message;
+
+    // Handle tool calls (loop in case of chained calls)
+    let iterations = 0;
+    while (choice?.tool_calls && choice.tool_calls.length > 0 && iterations < 3) {
+      iterations++;
+
+      // Add assistant message with tool calls to messages
+      messages.push(choice);
+
+      // Execute each tool call
+      for (const toolCall of choice.tool_calls) {
+        const args = JSON.parse(toolCall.function.arguments);
+        const result = await executeTool(toolCall.function.name, args);
+
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: result,
+        });
+      }
+
+      // Get next response
+      response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        tools: GPT_TOOLS,
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      choice = response.choices[0]?.message;
+    }
+
+    const reply = choice?.content ?? "Hmm, I got nothing. Try again?";
     addToHistory(conversationId, "assistant", reply);
     return reply;
   } catch (err) {
