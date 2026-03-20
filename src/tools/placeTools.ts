@@ -19,7 +19,7 @@ export const findPlacesDef: ChatCompletionTool = {
       properties: {
         term: {
           type: "string",
-          description: 'What to search for, e.g. "cocktail bars", "italian restaurant", "karaoke"',
+          description: 'What to search for, e.g. "cocktail bars", "italian restaurant", "karaoke", "bubble tea"',
         },
         location: {
           type: "string",
@@ -64,46 +64,85 @@ async function geocode(location: string): Promise<{ lat: number; lon: number } |
   }
 }
 
-const categoryMap: Record<string, string> = {
-  restaurant: "catering.restaurant",
-  restaurants: "catering.restaurant",
-  bar: "catering.bar",
-  bars: "catering.bar",
-  pub: "catering.pub",
-  pubs: "catering.pub",
-  club: "entertainment.club",
-  clubs: "entertainment.club",
-  nightclub: "entertainment.club.night",
-  cafe: "catering.cafe",
-  coffee: "catering.cafe",
-  food: "catering",
-  karaoke: "entertainment.karaoke",
-  pizza: "catering.restaurant",
-  burger: "catering.fast_food",
-  "fast food": "catering.fast_food",
-};
+// Match terms to Geoapify categories — use multiple categories for broader results
+function termToCategories(term: string): string {
+  const t = term.toLowerCase();
+
+  const map: Record<string, string> = {
+    restaurant: "catering.restaurant",
+    restaurants: "catering.restaurant",
+    bar: "catering.bar,catering.pub",
+    bars: "catering.bar,catering.pub",
+    pub: "catering.pub,catering.bar",
+    pubs: "catering.pub,catering.bar",
+    club: "entertainment.club",
+    clubs: "entertainment.club",
+    nightclub: "entertainment.club.night",
+    nightlife: "entertainment.club,catering.bar,catering.pub",
+    cafe: "catering.cafe",
+    coffee: "catering.cafe",
+    food: "catering",
+    karaoke: "entertainment",
+    pizza: "catering.restaurant,catering.fast_food",
+    burger: "catering.fast_food,catering.restaurant",
+    "fast food": "catering.fast_food",
+    dessert: "catering.cafe,catering.restaurant",
+    drinks: "catering.bar,catering.pub",
+    cocktail: "catering.bar",
+    cocktails: "catering.bar",
+  };
+
+  // Direct match
+  if (map[t]) return map[t];
+
+  // Partial match — check if any key is contained in the term
+  for (const [key, cats] of Object.entries(map)) {
+    if (t.includes(key)) return cats;
+  }
+
+  // Default: search broadly across catering + entertainment
+  return "catering,entertainment";
+}
 
 async function searchPlaces(term: string, location: string, limit: number): Promise<GeoapifyPlace[]> {
   try {
-    const category = categoryMap[term.toLowerCase()] ?? "catering";
+    const categories = termToCategories(term);
     const coords = await geocode(location);
     if (!coords) return [];
 
     const res = await axios.get("https://api.geoapify.com/v2/places", {
       params: {
-        categories: category,
+        categories,
         filter: `circle:${coords.lon},${coords.lat},2000`,
         bias: `proximity:${coords.lon},${coords.lat}`,
-        limit,
+        limit: limit * 3, // fetch extra so we can filter by name relevance
         apiKey: GEOAPIFY_KEY,
       },
     });
 
-    return (res.data?.features ?? []).map((f: any) => ({
+    let places: GeoapifyPlace[] = (res.data?.features ?? []).map((f: any) => ({
       ...f.properties,
       lat: f.geometry.coordinates[1],
       lon: f.geometry.coordinates[0],
     }));
+
+    // If the term is specific (not just "bars" or "restaurants"), try to filter by name match
+    const genericTerms = new Set(Object.keys(termToCategories));
+    const isSpecific = !genericTerms.has(term.toLowerCase());
+
+    if (isSpecific && places.length > 0) {
+      const termWords = term.toLowerCase().split(/\s+/);
+      const nameMatches = places.filter((p) => {
+        const name = (p.name ?? "").toLowerCase();
+        return termWords.some((w) => name.includes(w));
+      });
+      // Use name matches if we found any, otherwise return all
+      if (nameMatches.length > 0) {
+        places = nameMatches;
+      }
+    }
+
+    return places.slice(0, limit);
   } catch (err) {
     console.error("Geoapify error:", err instanceof Error ? err.message : err);
     return [];
@@ -117,12 +156,9 @@ function formatPlaceResults(places: GeoapifyPlace[]): string {
       const name = p.name ?? "Unnamed";
       const addr = p.formatted ?? p.address_line2 ?? "";
       const dist = p.distance ? ` - ${Math.round(p.distance)}m away` : "";
-      const cats = p.categories
-        .filter((c) => !c.startsWith("building") && !c.startsWith("commercial"))
-        .slice(0, 2)
-        .join(", ");
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}&query_place_id=${encodeURIComponent(name)}`;
-      return `${i + 1}. ${name}${dist}\n   ${cats}\n   ${addr}\n   ${mapsUrl}`;
+      const mapsQuery = encodeURIComponent(`${name}, ${addr}`).replace(/%20/g, "+");
+      const mapsUrl = `https://www.google.com/maps/search/${mapsQuery}`;
+      return `${i + 1}. ${name}${dist}\n   ${addr}\n   ${mapsUrl}`;
     })
     .join("\n\n");
 }
