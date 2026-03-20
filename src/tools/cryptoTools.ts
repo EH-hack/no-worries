@@ -4,7 +4,6 @@ import {
   Network,
   Account,
   Ed25519PrivateKey,
-  AccountAddress,
 } from "@endlesslab/endless-ts-sdk";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 
@@ -14,8 +13,7 @@ if (!MASTER_PRIVATE_KEY) {
   console.warn("ENDLESS_MASTER_KEY not set — crypto payments will be unavailable");
 }
 
-const USDT_ADDRESS = "USDH437BQjeVRzACuLiJQ6Bc9WaBSe1tWxcaNtJoa1s";
-const USDT_DECIMALS = 6;
+const EDS_DECIMALS = 8;
 const EXPLORER_BASE = "https://explorer.endless.link/txn";
 
 let endless: Endless;
@@ -70,7 +68,7 @@ export const sendCryptoDef: ChatCompletionTool = {
   function: {
     name: "send_crypto",
     description:
-      "Send USDT tokens to another group member on the Endless testnet. Use when someone says 'send @user 5' or 'pay @user 10 USDT'.",
+      "Send EDS tokens to another group member on the Endless testnet. Use when someone says 'send @user 5' or 'pay @user 2 EDS'.",
     parameters: {
       type: "object",
       properties: {
@@ -84,7 +82,7 @@ export const sendCryptoDef: ChatCompletionTool = {
         },
         amount: {
           type: "number",
-          description: "Amount of USDT to send (e.g. 5 for 5 USDT)",
+          description: "Amount of EDS to send (e.g. 0.5 for 0.5 EDS)",
         },
       },
       required: ["from_uid", "to_uid", "amount"],
@@ -97,7 +95,7 @@ export const checkBalanceDef: ChatCompletionTool = {
   function: {
     name: "check_crypto_balance",
     description:
-      "Check a user's USDT and EDS balance on the Endless testnet. Use when someone asks about their crypto balance or wallet.",
+      "Check a user's EDS balance on the Endless testnet. Use when someone asks about their crypto balance or wallet.",
     parameters: {
       type: "object",
       properties: {
@@ -116,7 +114,7 @@ export const fundUserDef: ChatCompletionTool = {
   function: {
     name: "fund_user",
     description:
-      "Fund a user's wallet with USDT from the bot's master wallet. Use when a new user needs testnet tokens to start sending payments.",
+      "Fund a user's wallet with EDS from the bot's master wallet. Use when a new user needs testnet tokens to start sending payments.",
     parameters: {
       type: "object",
       properties: {
@@ -126,7 +124,7 @@ export const fundUserDef: ChatCompletionTool = {
         },
         amount: {
           type: "number",
-          description: "Amount of USDT to send (default 10)",
+          description: "Amount of EDS to send (default 1)",
         },
       },
       required: ["uid"],
@@ -168,13 +166,10 @@ export async function sendCrypto(args: {
     const e = getEndless();
     const fromWallet = getOrCreateWallet(args.from_uid);
     const toWallet = getOrCreateWallet(args.to_uid);
-    const amountSmallest = Math.round(args.amount * 10 ** USDT_DECIMALS);
+    const amountSmallest = Math.round(args.amount * 10 ** EDS_DECIMALS);
 
-    const usdtMetadata = AccountAddress.fromBs58String(USDT_ADDRESS);
-
-    const transaction = await e.transferFungibleAsset({
+    const transaction = await e.transferEDS({
       sender: fromWallet.account,
-      fungibleAssetMetadataAddress: usdtMetadata,
       recipient: toWallet.account.accountAddress,
       amount: amountSmallest,
     });
@@ -184,14 +179,14 @@ export async function sendCrypto(args: {
       transaction,
     });
 
-    const result = await e.waitForTransaction({ transactionHash: pending.hash });
+    await e.waitForTransaction({ transactionHash: pending.hash });
 
     return JSON.stringify({
       success: true,
       from: args.from_uid,
       to: args.to_uid,
       amount: args.amount,
-      currency: "USDT",
+      currency: "EDS",
       txHash: pending.hash,
       explorerUrl: `${EXPLORER_BASE}/${pending.hash}?network=testnet`,
     });
@@ -211,25 +206,12 @@ export async function checkCryptoBalance(args: { uid: string }): Promise<string>
   try {
     const e = getEndless();
     const wallet = getOrCreateWallet(args.uid);
-    const usdtMetadata = AccountAddress.fromBs58String(USDT_ADDRESS);
 
-    let usdtBalance = 0;
     let edsBalance = 0;
-
-    try {
-      const usdtRaw = await e.getAccountCoinAmount({
-        accountAddress: wallet.account.accountAddress,
-        coinId: usdtMetadata.toString(),
-      });
-      usdtBalance = Number(usdtRaw) / 10 ** USDT_DECIMALS;
-    } catch {
-      // Account may not exist on-chain yet
-    }
-
     try {
       edsBalance = Number(await e.getAccountEDSAmount({
         accountAddress: wallet.account.accountAddress,
-      })) / 10 ** 8;
+      })) / 10 ** EDS_DECIMALS;
     } catch {
       // Account may not exist on-chain yet
     }
@@ -237,7 +219,6 @@ export async function checkCryptoBalance(args: { uid: string }): Promise<string>
     return JSON.stringify({
       uid: args.uid,
       address: wallet.address,
-      usdt: usdtBalance,
       eds: edsBalance,
     });
   } catch (err) {
@@ -255,28 +236,11 @@ export async function fundUser(args: { uid: string; amount?: number }): Promise<
     const e = getEndless();
     const master = getMasterAccount();
     const userWallet = getOrCreateWallet(args.uid);
-    const amount = args.amount ?? 10;
-    const amountSmallest = Math.round(amount * 10 ** USDT_DECIMALS);
-    const usdtMetadata = AccountAddress.fromBs58String(USDT_ADDRESS);
+    const amount = args.amount ?? 1;
+    const amountSmallest = Math.round(amount * 10 ** EDS_DECIMALS);
 
-    // First send some EDS for gas
-    try {
-      const edsTx = await e.transferEDS({
-        sender: master,
-        recipient: userWallet.account.accountAddress,
-        amount: 10000000, // 0.1 EDS for gas
-      });
-      const edsPending = await e.signAndSubmitTransaction({ signer: master, transaction: edsTx });
-      await e.waitForTransaction({ transactionHash: edsPending.hash });
-      console.log(`Funded ${args.uid} with 0.1 EDS for gas`);
-    } catch (err) {
-      console.error("EDS funding error:", err instanceof Error ? err.message : err);
-    }
-
-    // Then send USDT
-    const transaction = await e.transferFungibleAsset({
+    const transaction = await e.transferEDS({
       sender: master,
-      fungibleAssetMetadataAddress: usdtMetadata,
       recipient: userWallet.account.accountAddress,
       amount: amountSmallest,
     });
@@ -292,7 +256,7 @@ export async function fundUser(args: { uid: string; amount?: number }): Promise<
       success: true,
       uid: args.uid,
       funded: amount,
-      currency: "USDT",
+      currency: "EDS",
       address: userWallet.address,
       txHash: pending.hash,
       explorerUrl: `${EXPLORER_BASE}/${pending.hash}?network=testnet`,
