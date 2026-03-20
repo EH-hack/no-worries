@@ -33,22 +33,25 @@ interface ReceiveItem {
   type: 0 | 1;           // 0 = DM, 1 = group
 }
 
-interface ReceiveResponse {
-  code: number;
-  data: ReceiveItem[];
-}
+// API returns ReceiveItem[] directly (not wrapped in { code, data })
 
 // ─── Dedup cache ──────────────────────────────────────────────────────────────
 const seenMsgIds = new Set<string>();
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
+let pollCount = 0;
 async function fetchMessages(): Promise<ReceiveItem[]> {
-  const res = await axios.post<ReceiveResponse>(
+  const res = await axios.post<ReceiveItem[]>(
     `${BASE_URL}/receive`,
     { secret: SECRET },
     { headers: { "Content-Type": "application/json" } }
   );
-  return res.data?.data ?? [];
+  const items: ReceiveItem[] = Array.isArray(res.data) ? res.data : [];
+  pollCount++;
+  if (pollCount % 30 === 1 || items.length > 0) {
+    console.log(`🔍 Poll #${pollCount} — items: ${items.length}, raw:`, JSON.stringify(res.data));
+  }
+  return items;
 }
 
 async function sendDM(uid: string, text: string): Promise<void> {
