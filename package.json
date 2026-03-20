@@ -9,9 +9,11 @@
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
+    "@types/multer": "^2.1.0",
     "axios": "^1.7.2",
     "dotenv": "^17.3.1",
     "express": "^4.19.2",
+    "multer": "^2.1.1",
     "openai": "^6.32.0"
   },
   "devDependencies": {

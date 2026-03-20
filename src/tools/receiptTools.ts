@@ -1,8 +1,11 @@
 import OpenAI from "openai";
-import { CHATGPT_API_KEY } from "../config";
+import { CHATGPT_API_KEY, PUBLIC_URL } from "../config";
+import { sendGroupWithButton } from "../luffa";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({ apiKey: CHATGPT_API_KEY });
+
+// ─── parse_receipt: GPT-4o vision on a URL ────────────────────────────────────
 
 export const parseReceiptDef: ChatCompletionTool = {
   type: "function",
@@ -61,4 +64,41 @@ Return ONLY the JSON array, no other text.`,
     const msg = err instanceof Error ? err.message : String(err);
     return JSON.stringify({ error: `Failed to parse receipt: ${msg}` });
   }
+}
+
+// ─── request_receipt_upload: send upload link to group ─────────────────────────
+
+export const requestReceiptUploadDef: ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "request_receipt_upload",
+    description: "Send a receipt upload link to the group chat. Use this when someone wants to split a receipt, scan a bill, upload a photo of a receipt, etc. The link opens a page where they can take a photo or upload an image.",
+    parameters: {
+      type: "object",
+      properties: {
+        groupId: { type: "string", description: "The group chat ID" },
+        paidBy: { type: "string", description: "UID of the person who paid (if known)" },
+        description: { type: "string", description: "What the bill is for, e.g. 'dinner at Nandos'" },
+      },
+      required: ["groupId"],
+    },
+  },
+};
+
+export async function requestReceiptUpload(args: {
+  groupId: string;
+  paidBy?: string;
+  description?: string;
+}): Promise<string> {
+  const params = new URLSearchParams({ group: args.groupId });
+  if (args.paidBy) params.set("paidBy", args.paidBy);
+  if (args.description) params.set("desc", args.description);
+
+  const uploadUrl = `${PUBLIC_URL}/receipt?${params.toString()}`;
+
+  return JSON.stringify({
+    success: true,
+    uploadUrl,
+    message: `Upload link generated. Tell the user to open this link to upload their receipt photo: ${uploadUrl}`,
+  });
 }

@@ -53,3 +53,21 @@ export async function sendGroup(groupId: string, text: string): Promise<void> {
     { headers: { "Content-Type": "application/json" } }
   );
 }
+
+export async function sendGroupWithButton(
+  groupId: string,
+  text: string,
+  buttons: Array<{ name: string; selector: string }>
+): Promise<void> {
+  console.log(`Group button -> ${groupId}: ${text.slice(0, 80)}...`);
+  const msg = JSON.stringify({
+    text,
+    button: buttons.map((b) => ({ ...b, isHidden: "0" })),
+    dismissType: "select",
+  });
+  await axios.post(
+    `${BASE_URL}/sendGroup`,
+    { secret: SECRET, uid: groupId, msg, type: "2" },
+    { headers: { "Content-Type": "application/json" } }
+  );
+}
