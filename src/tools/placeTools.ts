@@ -83,8 +83,14 @@ function termToCategories(term: string): string {
     coffee: "catering.cafe",
     food: "catering",
     karaoke: "entertainment",
-    pizza: "catering.restaurant,catering.fast_food",
-    burger: "catering.fast_food,catering.restaurant",
+    pizza: "catering.restaurant.pizza,catering.fast_food.pizza,catering.restaurant",
+    burger: "catering.fast_food.burger,catering.restaurant,catering.fast_food",
+    sushi: "catering.restaurant.sushi,catering.restaurant",
+    chinese: "catering.restaurant.chinese,catering.restaurant",
+    indian: "catering.restaurant.indian,catering.restaurant",
+    thai: "catering.restaurant.thai,catering.restaurant",
+    mexican: "catering.restaurant.mexican,catering.restaurant",
+    ramen: "catering.restaurant.noodle,catering.restaurant",
     "fast food": "catering.fast_food",
     dessert: "catering.cafe,catering.restaurant",
     drinks: "catering.bar,catering.pub",
@@ -104,21 +110,44 @@ function termToCategories(term: string): string {
   return "catering,entertainment";
 }
 
+// Expose the map keys for use in searchPlaces
+const map = {
+  restaurant: true, restaurants: true, bar: true, bars: true,
+  pub: true, pubs: true, club: true, clubs: true, nightclub: true,
+  nightlife: true, cafe: true, coffee: true, food: true, karaoke: true,
+  pizza: true, burger: true, "fast food": true, dessert: true,
+  drinks: true, cocktail: true, cocktails: true, sushi: true,
+  chinese: true, indian: true, thai: true, mexican: true, ramen: true,
+};
+
 async function searchPlaces(term: string, location: string, limit: number): Promise<GeoapifyPlace[]> {
   try {
     const categories = termToCategories(term);
     const coords = await geocode(location);
     if (!coords) return [];
 
-    const res = await axios.get("https://api.geoapify.com/v2/places", {
-      params: {
-        categories,
-        filter: `circle:${coords.lon},${coords.lat},2000`,
-        bias: `proximity:${coords.lon},${coords.lat}`,
-        limit: limit * 3, // fetch extra so we can filter by name relevance
-        apiKey: GEOAPIFY_KEY,
-      },
-    });
+    // First try: name-filtered search for relevance
+    const termWords = term.toLowerCase().split(/\s+/);
+    const nameFilter = termWords[0]; // Use first word as name filter
+
+    const params: Record<string, any> = {
+      categories,
+      filter: `circle:${coords.lon},${coords.lat},2000`,
+      bias: `proximity:${coords.lon},${coords.lat}`,
+      limit: limit * 3,
+      apiKey: GEOAPIFY_KEY,
+      conditions: "named", // Exclude unnamed POIs
+    };
+
+    // Try with name filter first for specific searches
+    const genericTerms = new Set(Object.keys(map));
+    const isSpecific = !genericTerms.has(term.toLowerCase());
+
+    if (isSpecific) {
+      params.name = nameFilter;
+    }
+
+    let res = await axios.get("https://api.geoapify.com/v2/places", { params });
 
     let places: GeoapifyPlace[] = (res.data?.features ?? []).map((f: any) => ({
       ...f.properties,
@@ -126,17 +155,21 @@ async function searchPlaces(term: string, location: string, limit: number): Prom
       lon: f.geometry.coordinates[0],
     }));
 
-    // If the term is specific (not just "bars" or "restaurants"), try to filter by name match
-    const genericTerms = new Set(Object.keys(termToCategories));
-    const isSpecific = !genericTerms.has(term.toLowerCase());
+    // Fall back to broader search without name filter if no results
+    if (places.length === 0 && isSpecific) {
+      delete params.name;
+      res = await axios.get("https://api.geoapify.com/v2/places", { params });
+      places = (res.data?.features ?? []).map((f: any) => ({
+        ...f.properties,
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
+      }));
 
-    if (isSpecific && places.length > 0) {
-      const termWords = term.toLowerCase().split(/\s+/);
+      // Still try to prefer name matches in the broader results
       const nameMatches = places.filter((p) => {
         const name = (p.name ?? "").toLowerCase();
         return termWords.some((w) => name.includes(w));
       });
-      // Use name matches if we found any, otherwise return all
       if (nameMatches.length > 0) {
         places = nameMatches;
       }
