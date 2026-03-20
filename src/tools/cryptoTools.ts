@@ -14,7 +14,7 @@ if (!MASTER_PRIVATE_KEY) {
 }
 
 const EDS_DECIMALS = 8;
-const EXPLORER_BASE = "https://scan.endless.link/transaction";
+const EXPLORER_URL = "https://scan.endless.link/account";
 
 let endless: Endless;
 let masterAccount: Account;
@@ -188,7 +188,7 @@ export async function sendCrypto(args: {
       amount: args.amount,
       currency: "EDS",
       txHash: pending.hash,
-      explorerUrl: `${EXPLORER_BASE}/${pending.hash}?network=testnet`,
+      explorerUrl: `${EXPLORER_URL}/${fromWallet.address}?network=testnet`,
     });
   } catch (err) {
     console.error("Send crypto error:", err instanceof Error ? err.message : err);
@@ -259,7 +259,7 @@ export async function fundUser(args: { uid: string; amount?: number }): Promise<
       currency: "EDS",
       address: userWallet.address,
       txHash: pending.hash,
-      explorerUrl: `${EXPLORER_BASE}/${pending.hash}?network=testnet`,
+      explorerUrl: `${EXPLORER_URL}/${userWallet.address}?network=testnet`,
     });
   } catch (err) {
     console.error("Fund user error:", err instanceof Error ? err.message : err);
