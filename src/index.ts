@@ -266,6 +266,7 @@ async function askGPT(conversationId: string, userMessage: string): Promise<stri
 
       // Execute each tool call
       for (const toolCall of choice.tool_calls) {
+        if (toolCall.type !== "function") continue;
         const args = JSON.parse(toolCall.function.arguments);
         const result = await executeTool(toolCall.function.name, args);
 
