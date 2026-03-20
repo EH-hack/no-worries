@@ -52,7 +52,8 @@ async function fetchMessages(): Promise<ReceiveItem[]> {
 }
 
 async function sendDM(uid: string, text: string): Promise<void> {
-  await axios.post(
+  console.log(`📤 Sending DM to ${uid}: ${text}`);
+  const res = await axios.post(
     `${BASE_URL}/send`,
     {
       secret: SECRET,
@@ -61,10 +62,12 @@ async function sendDM(uid: string, text: string): Promise<void> {
     },
     { headers: { "Content-Type": "application/json" } }
   );
+  console.log(`📤 sendDM response:`, JSON.stringify(res.data));
 }
 
 async function sendGroup(groupId: string, text: string): Promise<void> {
-  await axios.post(
+  console.log(`📤 Sending group msg to ${groupId}: ${text}`);
+  const res = await axios.post(
     `${BASE_URL}/sendGroup`,
     {
       secret: SECRET,
@@ -74,6 +77,7 @@ async function sendGroup(groupId: string, text: string): Promise<void> {
     },
     { headers: { "Content-Type": "application/json" } }
   );
+  console.log(`📤 sendGroup response:`, JSON.stringify(res.data));
 }
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
