@@ -30,10 +30,11 @@ async function handleGroupMessage(
   urlLink: string | null
 ): Promise<void> {
   console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}"`);
+  const groupIdHint = `\n\nGroup ID for tool calls: ${groupId}`;
   const message = urlLink
-    ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]\n\nGroup ID for tool calls: ${groupId}`
-    : `[${senderUid}]: ${text}\n\nGroup ID for tool calls: ${groupId}`;
-  const reply = await runAgent(`group:${groupId}`, message);
+    ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]${groupIdHint}`
+    : `[${senderUid}]: ${text}${groupIdHint}`;
+  const reply = await runAgent(`group:${groupId}`, message, groupId);
   await sendGroup(groupId, reply);
 }
 
