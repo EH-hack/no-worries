@@ -156,8 +156,7 @@ function formatPlaceResults(places: GeoapifyPlace[]): string {
       const name = p.name ?? "Unnamed";
       const addr = p.formatted ?? p.address_line2 ?? "";
       const dist = p.distance ? ` - ${Math.round(p.distance)}m away` : "";
-      const mapsQuery = encodeURIComponent(`${name}, ${addr}`).replace(/%20/g, "+");
-      const mapsUrl = `https://www.google.com/maps/search/${mapsQuery}`;
+      const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(name)}&near=${p.lat},${p.lon}`;
       return `${i + 1}. ${name}${dist}\n   ${addr}\n   ${mapsUrl}`;
     })
     .join("\n\n");
