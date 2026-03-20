@@ -24,6 +24,7 @@ if (!process.env.CHATGPT_API_KEY) {
   process.exit(1);
 }
 
+console.log("🔑 Env vars available:", Object.keys(process.env).filter(k => !k.startsWith("npm_")).join(", "));
 const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY ?? "";
 if (!GEOAPIFY_KEY) {
   console.warn("⚠️  GEOAPIFY_KEY not set — place search will be unavailable");
