@@ -24,10 +24,20 @@ export interface Debt {
   amountCents: number;
 }
 
+export interface MemberLocation {
+  home?: string;        // persistent, e.g. "Shoreditch, London"
+  homeLat?: number;
+  homeLon?: number;
+  current?: string;     // temporary override, e.g. "Soho, London"
+  currentLat?: number;
+  currentLon?: number;
+}
+
 export interface GroupState {
   members: string[]; // UIDs
   bills: Bill[];
   debts: Debt[];
+  locations: Record<string, MemberLocation>; // uid → location
 }
 
 export interface AppState {
@@ -40,7 +50,9 @@ export function newAppState(): AppState {
 
 export function ensureGroup(state: AppState, groupId: string): GroupState {
   if (!state.groups[groupId]) {
-    state.groups[groupId] = { members: [], bills: [], debts: [] };
+    state.groups[groupId] = { members: [], bills: [], debts: [], locations: {} };
   }
-  return state.groups[groupId];
+  const group = state.groups[groupId];
+  if (!group.locations) group.locations = {};
+  return group;
 }
