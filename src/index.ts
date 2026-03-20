@@ -36,7 +36,13 @@ async function poll(): Promise<void> {
     const items = await fetchMessages();
 
     for (const item of items) {
+      // Log the FULL item envelope — catches images even if message array is empty
+      console.log("Receive item:", JSON.stringify(item));
+
       for (const rawStr of item.message) {
+        // Log every raw message string before parsing
+        console.log("Raw message:", rawStr);
+
         let parsed: RawMessage | GroupRawMessage;
         try {
           parsed = JSON.parse(rawStr);
@@ -44,9 +50,6 @@ async function poll(): Promise<void> {
           console.warn("Could not parse message JSON:", rawStr);
           continue;
         }
-
-        // Log every raw message so we can debug image/receipt payloads
-        console.log("Raw message:", rawStr);
 
         if (seenMsgIds.has(parsed.msgId)) continue;
         seenMsgIds.add(parsed.msgId);
