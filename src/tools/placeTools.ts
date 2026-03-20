@@ -110,44 +110,73 @@ function termToCategories(term: string): string {
   return "catering,entertainment";
 }
 
-// Expose the map keys for use in searchPlaces
-const map = {
-  restaurant: true, restaurants: true, bar: true, bars: true,
-  pub: true, pubs: true, club: true, clubs: true, nightclub: true,
-  nightlife: true, cafe: true, coffee: true, food: true, karaoke: true,
-  pizza: true, burger: true, "fast food": true, dessert: true,
-  drinks: true, cocktail: true, cocktails: true, sushi: true,
-  chinese: true, indian: true, thai: true, mexican: true, ramen: true,
-};
+// Generic terms that map cleanly to categories — no text search needed
+const GENERIC_TERMS = new Set([
+  "restaurant", "restaurants", "bar", "bars", "pub", "pubs",
+  "club", "clubs", "nightclub", "nightlife", "cafe", "coffee",
+  "food", "karaoke", "fast food", "dessert", "drinks", "cocktail", "cocktails",
+]);
+
+// Text-search via Geoapify geocoding autocomplete (keyword-based, not category-based)
+async function textSearchPlaces(
+  term: string,
+  coords: { lat: number; lon: number },
+  limit: number
+): Promise<GeoapifyPlace[]> {
+  try {
+    const res = await axios.get("https://api.geoapify.com/v1/geocode/autocomplete", {
+      params: {
+        text: term,
+        type: "amenity",
+        filter: `circle:${coords.lon},${coords.lat},3000`,
+        bias: `proximity:${coords.lon},${coords.lat}`,
+        limit,
+        format: "json",
+        apiKey: GEOAPIFY_KEY,
+      },
+    });
+    return (res.data?.results ?? []).map((r: any) => ({
+      name: r.name,
+      categories: r.category ? [r.category] : [],
+      formatted: r.formatted,
+      address_line1: r.address_line1,
+      address_line2: r.address_line2,
+      lat: r.lat,
+      lon: r.lon,
+      place_id: r.place_id ?? "",
+      distance: r.distance,
+    }));
+  } catch (err) {
+    console.error("Text search error:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
 
 async function searchPlaces(term: string, location: string, limit: number): Promise<GeoapifyPlace[]> {
   try {
-    const categories = termToCategories(term);
     const coords = await geocode(location);
     if (!coords) return [];
 
-    // First try: name-filtered search for relevance
-    const termWords = term.toLowerCase().split(/\s+/);
-    const nameFilter = termWords[0]; // Use first word as name filter
+    const isGeneric = GENERIC_TERMS.has(term.toLowerCase());
 
-    const params: Record<string, any> = {
-      categories,
-      filter: `circle:${coords.lon},${coords.lat},2000`,
-      bias: `proximity:${coords.lon},${coords.lat}`,
-      limit: limit * 3,
-      apiKey: GEOAPIFY_KEY,
-      conditions: "named", // Exclude unnamed POIs
-    };
-
-    // Try with name filter first for specific searches
-    const genericTerms = new Set(Object.keys(map));
-    const isSpecific = !genericTerms.has(term.toLowerCase());
-
-    if (isSpecific) {
-      params.name = nameFilter;
+    // For specific terms (pizza, sushi, etc.), use text search first — it's keyword-based
+    if (!isGeneric) {
+      const textResults = await textSearchPlaces(term, coords, limit);
+      if (textResults.length > 0) return textResults;
     }
 
-    let res = await axios.get("https://api.geoapify.com/v2/places", { params });
+    // Fall back to category-based search for generic terms or if text search returned nothing
+    const categories = termToCategories(term);
+    const res = await axios.get("https://api.geoapify.com/v2/places", {
+      params: {
+        categories,
+        filter: `circle:${coords.lon},${coords.lat},2000`,
+        bias: `proximity:${coords.lon},${coords.lat}`,
+        limit: limit * 3,
+        conditions: "named",
+        apiKey: GEOAPIFY_KEY,
+      },
+    });
 
     let places: GeoapifyPlace[] = (res.data?.features ?? []).map((f: any) => ({
       ...f.properties,
@@ -155,20 +184,13 @@ async function searchPlaces(term: string, location: string, limit: number): Prom
       lon: f.geometry.coordinates[0],
     }));
 
-    // Fall back to broader search without name filter if no results
-    if (places.length === 0 && isSpecific) {
-      delete params.name;
-      res = await axios.get("https://api.geoapify.com/v2/places", { params });
-      places = (res.data?.features ?? []).map((f: any) => ({
-        ...f.properties,
-        lat: f.geometry.coordinates[1],
-        lon: f.geometry.coordinates[0],
-      }));
-
-      // Still try to prefer name matches in the broader results
+    // For specific terms, prefer name matches from category results
+    if (!isGeneric && places.length > 0) {
+      const termWords = term.toLowerCase().split(/\s+/);
       const nameMatches = places.filter((p) => {
         const name = (p.name ?? "").toLowerCase();
-        return termWords.some((w) => name.includes(w));
+        const cats = (p.categories ?? []).join(" ").toLowerCase();
+        return termWords.some((w) => name.includes(w) || cats.includes(w));
       });
       if (nameMatches.length > 0) {
         places = nameMatches;
