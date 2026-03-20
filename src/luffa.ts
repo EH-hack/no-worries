@@ -31,7 +31,7 @@ export async function fetchMessages(): Promise<ReceiveItem[]> {
   const items: ReceiveItem[] = Array.isArray(res.data) ? res.data : [];
   pollCount++;
   if (pollCount % 30 === 1 || items.length > 0) {
-    console.log(`Poll #${pollCount} - items: ${items.length}`);
+    console.log(`Poll #${pollCount} - items: ${items.length}`, items.length > 0 ? JSON.stringify(res.data) : "");
   }
   return items;
 }

@@ -8,9 +8,9 @@ const seenMsgIds = new Set<string>();
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
 async function handleDM(senderUid: string, text: string, urlLink: string | null): Promise<void> {
-  console.log(`DM from ${senderUid}: ${text}`);
+  console.log(`DM from ${senderUid}: text="${text}" urlLink="${urlLink}"`);
   const message = urlLink
-    ? `${text}\n\n[Receipt image: ${urlLink}]`
+    ? `${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]`
     : text;
   const reply = await runAgent(`dm:${senderUid}`, message);
   await sendDM(senderUid, reply);
@@ -22,9 +22,9 @@ async function handleGroupMessage(
   text: string,
   urlLink: string | null
 ): Promise<void> {
-  console.log(`Group [${groupId}] from ${senderUid}: ${text}`);
+  console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}"`);
   const message = urlLink
-    ? `[${senderUid}]: ${text}\n\n[Receipt image: ${urlLink}]\n\nGroup ID for tool calls: ${groupId}`
+    ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]\n\nGroup ID for tool calls: ${groupId}`
     : `[${senderUid}]: ${text}\n\nGroup ID for tool calls: ${groupId}`;
   const reply = await runAgent(`group:${groupId}`, message);
   await sendGroup(groupId, reply);
@@ -45,6 +45,9 @@ async function poll(): Promise<void> {
           continue;
         }
 
+        // Log every raw message so we can debug image/receipt payloads
+        console.log("Raw message:", rawStr);
+
         if (seenMsgIds.has(parsed.msgId)) continue;
         seenMsgIds.add(parsed.msgId);
 
@@ -53,15 +56,24 @@ async function poll(): Promise<void> {
           if (first) seenMsgIds.delete(first);
         }
 
+        const text = parsed.text ?? "";
+        const urlLink = parsed.urlLink ?? null;
+
+        // Skip messages with no text AND no image
+        if (!text && !urlLink) {
+          console.log("Skipping empty message (no text, no urlLink)");
+          continue;
+        }
+
         if (item.type === 0) {
-          await handleDM(item.uid, parsed.text ?? "", parsed.urlLink);
+          await handleDM(item.uid, text, urlLink);
         } else {
           const groupMsg = parsed as GroupRawMessage;
           await handleGroupMessage(
             item.uid,
             groupMsg.uid ?? "unknown",
-            parsed.text ?? "",
-            parsed.urlLink
+            text,
+            urlLink
           );
         }
       }
