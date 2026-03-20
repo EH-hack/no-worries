@@ -14,7 +14,7 @@ if (!MASTER_PRIVATE_KEY) {
 }
 
 const EDS_DECIMALS = 8;
-const EXPLORER_BASE = "https://explorer.endless.link/txn";
+const EXPLORER_BASE = "https://scan.endless.link/transaction";
 
 let endless: Endless;
 let masterAccount: Account;
