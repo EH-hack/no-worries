@@ -49,7 +49,7 @@ interface GeoapifyPlace {
   distance?: number;
 }
 
-async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
+export async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
   try {
     const res = await axios.get("https://api.geoapify.com/v1/geocode/search", {
       params: { text: location, apiKey: GEOAPIFY_KEY, limit: 1 },
@@ -118,7 +118,7 @@ const GENERIC_TERMS = new Set([
 ]);
 
 // Text-search via Geoapify geocoding autocomplete (keyword-based, not category-based)
-async function textSearchPlaces(
+export async function textSearchPlaces(
   term: string,
   coords: { lat: number; lon: number },
   limit: number
@@ -152,7 +152,7 @@ async function textSearchPlaces(
   }
 }
 
-async function searchPlaces(term: string, location: string, limit: number): Promise<GeoapifyPlace[]> {
+export async function searchPlaces(term: string, location: string, limit: number): Promise<GeoapifyPlace[]> {
   try {
     const coords = await geocode(location);
     if (!coords) return [];
