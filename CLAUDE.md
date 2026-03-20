@@ -1,234 +1,91 @@
-# No Worries - AI Agent for Group Planning
+# No Worries - Luffa Group Chat AI Agent
 
 ## Project Overview
-**Type**: Hackathon POC
-**Purpose**: AI agent for group planning integrated with Luffa (blockchain-enabled messaging service)
+**Type**: Hackathon project (Encode Club)
+**Purpose**: AI agent for bill splitting, balance tracking, and group planning in Luffa group chats
 **Hosting**: Railway
-**Status**: Starting from scratch
-
-## What is Luffa?
-- Blockchain-enabled messaging platform built on Endless blockchain (Move programming language)
-- End-to-end encrypted messaging
-- Supports channels, groups, and supergroups
-- Has bot/mini-program capabilities
-- Can integrate with OpenClaw for AI agent deployment
-- Acts as the **frontend** for this project (users interact via Luffa groups)
+**Stack**: TypeScript, Express, OpenAI GPT-4o-mini, Luffa Bot API
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     LUFFA (Frontend)                        │
-│              Users message in groups/channels               │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     │ Webhook/Polling
-                     ↓
-┌─────────────────────────────────────────────────────────────┐
-│              RAILWAY-HOSTED BACKEND                         │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  HTTP Server (Express/FastAPI)                      │   │
-│  │  - Receives messages from Luffa                     │   │
-│  │  - Routes to AI Agent                               │   │
-│  │  - Sends responses back                             │   │
-│  └────────────┬────────────────────────────────────────┘   │
-│               │                                             │
-│  ┌────────────▼────────────────────────────────────────┐   │
-│  │  AI Agent (Group Planning Logic)                    │   │
-│  │  - Natural language understanding                   │   │
-│  │  - Planning features (scheduling, voting, etc)      │   │
-│  │  - Context management                               │   │
-│  └────────────┬────────────────────────────────────────┘   │
-│               │                                             │
-│  ┌────────────▼────────────────────────────────────────┐   │
-│  │  JSON File Storage (POC/Hackathon)                  │   │
-│  │  - conversations.json                               │   │
-│  │  - plans.json                                       │   │
-│  │  - users.json                                       │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+Luffa Group Chat
+    │ polling (1s interval)
+    ▼
+src/index.ts          ← Express health-check + poll loop + message routing
+src/config.ts         ← Env vars (LUFFA_SECRET, CHATGPT_API_KEY, GEOAPIFY_KEY)
+src/luffa.ts          ← Luffa API: fetchMessages, sendDM, sendGroup
+src/agent.ts          ← Agentic GPT loop (tool calls → execute → feed back, up to 10 rounds)
+src/prompt.ts         ← System prompt with tool usage instructions
+src/history.ts        ← Per-conversation message history (in-memory, bounded to 20)
+src/store.ts          ← JSON file persistence (data/state.json, atomic writes)
+src/billing/
+  types.ts            ← Bill, LineItem, Debt, GroupState, AppState interfaces
+  engine.ts           ← Split algorithms (equal, per-item) + debt simplification
+src/tools/
+  index.ts            ← Tool definitions + dispatch switch
+  billTools.ts        ← create_bill, add_items, set_tax_and_tip, split_bill
+  balanceTools.ts     ← get_balances, record_payment, get_group_summary
+  receiptTools.ts     ← parse_receipt (GPT-4o vision)
+  placeTools.ts       ← find_places (Geoapify geocode + places API)
 ```
 
-## Data Flow
+## Data Model
 
-1. **User sends message in Luffa group** → "Let's plan dinner for Friday"
-2. **Luffa forwards to Railway** → HTTP POST to webhook endpoint
-3. **Server receives & parses** → Extract message, user, group context
-4. **Load context from JSON** → Read conversations.json, plans.json
-5. **AI Agent processes** → Generate response based on group planning needs
-6. **Update JSON storage** → Save new message, update plan state
-7. **Send response to Luffa** → API call back to Luffa
-8. **User sees AI response** → "Great! I'll help coordinate. What time works for everyone?"
+- **All money in cents** (integers) to avoid float precision
+- `LineItem`: name, priceCents, quantity, assignedTo (UIDs — empty = all members)
+- `Bill`: items, tax, tip, splitStrategy, splits (uid → cents), finalized flag
+- `GroupState`: members, bills, simplified debts
+- `AppState`: groups map → persisted to `data/state.json`
 
-## Technology Stack (TBD - To be decided with developer)
+## Agentic Loop
 
-### Backend Options:
-- **Python + FastAPI** (recommended for AI integration)
-  - Lightweight, async, easy Railway deployment
-  - Good AI/ML library ecosystem
-- **Node.js + Express** (alternative)
-  - Fast, simple, JSON-native
+Manual tool-calling loop in `agent.ts`:
+1. Send messages + tool definitions to GPT-4o-mini
+2. If GPT returns tool_calls, execute them via `executeTool()` dispatch
+3. Feed tool results back as `role: "tool"` messages
+4. Repeat until GPT returns a text response (max 10 rounds)
 
-### AI Integration:
-- Anthropic Claude API (or OpenAI)
-- LangChain (optional, for more complex agents)
+## Split Algorithms
 
-### Storage:
-- JSON files (POC phase)
-- Future: SQLite → PostgreSQL
+- **Equal**: total / N, remainder to payer
+- **Per-item**: each item split among its assignedTo list; tax+tip distributed proportionally
+- **Debt simplification**: net settlement — compute net balance per person, greedily match largest debtor with largest creditor (at most N-1 transactions)
 
-## Core Features (POC Scope)
+## Luffa Integration
 
-1. **Event Scheduling**
-   - Parse date/time from natural language
-   - Collect availability from group members
-   - Find common time slots
+- **Polling**: POST to `https://apibot.luffa.im/robot/receive` every 1s
+- **Send DM**: POST to `/robot/send` with `{ secret, uid, msg }`
+- **Send Group**: POST to `/robot/sendGroup` with `{ secret, uid, msg, type: "1" }`
+- Messages are JSON strings inside `ReceiveItem.message[]` array
+- Each message has `msgId` for dedup, `uid`, `text`, `urlLink`, `atList`
+- Group messages: `item.uid` = group ID, `parsed.uid` = sender UID
+- `urlLink` (receipt images) passed through to agent for `parse_receipt` tool
 
-2. **Decision Making**
-   - Voting on options (e.g., restaurant, activity)
-   - Track responses
-   - Announce results
+## Environment Variables
 
-3. **Task Coordination**
-   - Create task lists for group activities
-   - Assign responsibilities
-   - Track completion
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `LUFFA_SECRET` | Yes | Bot authentication with Luffa API |
+| `CHATGPT_API_KEY` | Yes | OpenAI API key for GPT-4o-mini + GPT-4o vision |
+| `GEOAPIFY_KEY` | No | Place search (find_places tool) |
+| `PORT` | No | Express port (default 3000) |
 
-4. **Context Awareness**
-   - Remember ongoing plans per group
-   - Track user preferences
-   - Maintain conversation history
+## Commands
 
-## Luffa Integration Notes
-
-### What We Know:
-- Luffa supports bot/mini-program development
-- Can integrate with AI agents (OpenClaw mentioned)
-- End-to-end encrypted (important for design)
-
-### What We Need:
-- [ ] Luffa API documentation (from hackathon organizers)
-- [ ] Bot creation process
-- [ ] Webhook setup OR polling mechanism
-- [ ] Authentication/API keys
-- [ ] Message format specification
-- [ ] How to send messages back to groups
-
-### Integration Method (TBD):
-- **Option A**: Webhook (Luffa pushes messages to our Railway endpoint)
-- **Option B**: Polling (our agent periodically checks Luffa for new messages)
-- **Option C**: Bot API (native Luffa bot account)
-
-## Railway Deployment
-
-Railway provides:
-- Simple deployment from Git
-- Environment variables for secrets
-- Auto-scaling
-- HTTPS endpoints
-- Good for hackathon speed
-
-## JSON Storage Schema (Draft)
-
-### conversations.json
-```json
-{
-  "group_id_123": {
-    "messages": [
-      {
-        "id": "msg_001",
-        "user_id": "user_456",
-        "username": "Alice",
-        "text": "Let's plan dinner",
-        "timestamp": "2026-03-20T20:00:00Z"
-      }
-    ],
-    "context": {
-      "active_plans": ["plan_789"],
-      "last_activity": "2026-03-20T20:00:00Z"
-    }
-  }
-}
+```bash
+npm run dev    # Run with ts-node
+npm run build  # Compile TypeScript to dist/
+npm start      # Run compiled JS (production)
 ```
 
-### plans.json
-```json
-{
-  "plan_789": {
-    "group_id": "group_id_123",
-    "type": "event_scheduling",
-    "title": "Friday Dinner",
-    "status": "collecting_responses",
-    "created_at": "2026-03-20T20:00:00Z",
-    "data": {
-      "event_time": null,
-      "location": null,
-      "attendees": [],
-      "responses": {}
-    }
-  }
-}
-```
+## Key Design Decisions
 
-### users.json
-```json
-{
-  "user_456": {
-    "username": "Alice",
-    "preferences": {
-      "timezone": "America/New_York",
-      "dietary_restrictions": []
-    },
-    "groups": ["group_id_123"]
-  }
-}
-```
-
-## Development Phases
-
-### Phase 1: Basic Setup ✓
-- [x] Create CLAUDE.md
-- [ ] Set up project structure
-- [ ] Initialize Git repo with first commit
-
-### Phase 2: Core Backend
-- [ ] Create HTTP server with health check endpoint
-- [ ] Implement JSON storage layer
-- [ ] Test local server
-
-### Phase 3: AI Agent
-- [ ] Integrate AI API (Claude/OpenAI)
-- [ ] Implement group planning logic
-- [ ] Test with mock messages
-
-### Phase 4: Luffa Integration
-- [ ] Get Luffa API credentials
-- [ ] Implement message receiving
-- [ ] Implement message sending
-- [ ] End-to-end test
-
-### Phase 5: Polish & Deploy
-- [ ] Deploy to Railway
-- [ ] Test with real Luffa group
-- [ ] Fix bugs, improve responses
-- [ ] Prepare demo
-
-## Questions to Resolve
-
-1. **Luffa API Access**: How do we get developer credentials?
-2. **Message Format**: What's the exact structure of Luffa messages?
-3. **AI Provider**: Claude vs OpenAI vs other?
-4. **Language**: Python vs Node.js?
-5. **Deployment**: Railway config needs?
-
-## Notes & Learnings
-
-- Luffa is relatively new/emerging platform (limited public docs)
-- Endless blockchain uses Move language (like Sui/Aptos)
-- Privacy-focused (E2EE) - can't read message content on blockchain
-- Hackathon likely provides special developer access/docs
+- Group ID is injected into user messages so GPT can pass it to tool calls
+- Conversation history is in-memory (lost on restart) but bill state persists to JSON
+- Payments are modelled as reverse bills to reuse the debt simplification logic
+- No zod — plain JSON schemas for tool definitions (simpler with OpenAI SDK v6)
 
 ---
 
 **Last Updated**: 2026-03-20
-**Next Steps**: Set up project structure and choose tech stack
