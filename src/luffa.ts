@@ -1,9 +1,16 @@
 import axios from "axios";
 import { SECRET, BASE_URL } from "./config";
 
+export interface AtMention {
+  name: string;
+  did: string;       // the user's UID
+  length: number;
+  location: number;
+}
+
 export interface RawMessage {
   uid: string;
-  atList: string[];
+  atList: AtMention[];
   text: string;
   urlLink: string | null;
   msgId: string;

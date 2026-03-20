@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { PORT, POLL_INTERVAL_MS } from "./config";
-import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage } from "./luffa";
+import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
 import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
@@ -27,10 +27,19 @@ async function handleGroupMessage(
   groupId: string,
   senderUid: string,
   text: string,
-  urlLink: string | null
+  urlLink: string | null,
+  atList: AtMention[]
 ): Promise<void> {
-  console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}"`);
-  const groupIdHint = `\n\nGroup ID for tool calls: ${groupId}`;
+  console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}" atList=${JSON.stringify(atList)}`);
+
+  // Build mention mapping so GPT knows display names → UIDs
+  let mentionHint = "";
+  if (atList.length > 0) {
+    const mappings = atList.map((m) => `@${m.name} = UID "${m.did}"`).join(", ");
+    mentionHint = `\nMention mappings: ${mappings}`;
+  }
+
+  const groupIdHint = `\n\nSender UID: ${senderUid}${mentionHint}\nGroup ID for tool calls: ${groupId}`;
   const message = urlLink
     ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]${groupIdHint}`
     : `[${senderUid}]: ${text}${groupIdHint}`;
@@ -81,7 +90,8 @@ async function poll(): Promise<void> {
             item.uid,
             groupMsg.uid ?? "unknown",
             text,
-            urlLink
+            urlLink,
+            parsed.atList ?? []
           );
         }
       }

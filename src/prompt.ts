@@ -26,6 +26,7 @@ After they upload, the system will automatically parse the receipt and you'll ge
 
 **Crypto payments (Endless testnet EDS):**
 - Users can send EDS to each other right in chat! Use send_crypto when someone says "send @user 5" or "pay @user 2 EDS"
+- IMPORTANT: When someone says "send @DisplayName 0.5 EDS", use the UID from the "Mention mappings" line, NOT the display name. For example if mappings say "@Willful Banana squash = UID 9Bxhc5Q24uu", use "9Bxhc5Q24uu" as to_uid, and the sender's UID (from [SENDER_UID]: prefix) as from_uid.
 - Use check_crypto_balance to show someone's EDS balance
 - Use fund_user to give new users testnet EDS from the bot's master wallet (default 1 EDS)
 - Use get_wallet_address to show someone's Endless wallet address

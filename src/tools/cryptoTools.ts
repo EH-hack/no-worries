@@ -153,6 +153,38 @@ export const getWalletAddressDef: ChatCompletionTool = {
 
 // ─── Tool implementations ────────────────────────────────────────────────────
 
+// Ensure a wallet is funded with enough EDS for gas + the transfer amount
+async function ensureFunded(wallet: UserWallet, needAmount: number): Promise<void> {
+  const e = getEndless();
+  const master = getMasterAccount();
+
+  let currentBalance = 0;
+  try {
+    currentBalance = Number(await e.getAccountEDSAmount({
+      accountAddress: wallet.account.accountAddress,
+    })) / 10 ** EDS_DECIMALS;
+  } catch {
+    // Account doesn't exist on-chain yet — needs funding
+  }
+
+  // Fund if balance is less than what's needed (amount + 0.1 EDS for gas)
+  const needed = needAmount + 0.1;
+  if (currentBalance < needed) {
+    const fundAmount = Math.max(needed - currentBalance, 0.5); // fund at least 0.5 EDS
+    const fundSmallest = Math.round(fundAmount * 10 ** EDS_DECIMALS);
+    console.log(`Auto-funding ${wallet.uid}: ${fundAmount} EDS (current: ${currentBalance}, need: ${needed})`);
+
+    const tx = await e.transferEDS({
+      sender: master,
+      recipient: wallet.account.accountAddress,
+      amount: fundSmallest,
+    });
+    const pending = await e.signAndSubmitTransaction({ signer: master, transaction: tx });
+    await e.waitForTransaction({ transactionHash: pending.hash });
+    console.log(`Auto-funded ${wallet.uid} with ${fundAmount} EDS`);
+  }
+}
+
 export async function sendCrypto(args: {
   from_uid: string;
   to_uid: string;
@@ -167,6 +199,11 @@ export async function sendCrypto(args: {
     const fromWallet = getOrCreateWallet(args.from_uid);
     const toWallet = getOrCreateWallet(args.to_uid);
     const amountSmallest = Math.round(args.amount * 10 ** EDS_DECIMALS);
+
+    // Auto-fund sender if they don't have enough
+    await ensureFunded(fromWallet, args.amount);
+    // Ensure receiver account exists on-chain (needs some EDS)
+    await ensureFunded(toWallet, 0);
 
     const transaction = await e.transferEDS({
       sender: fromWallet.account,
