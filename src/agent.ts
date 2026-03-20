@@ -10,7 +10,8 @@ const MAX_TOOL_ROUNDS = 10;
 
 export async function runAgent(
   conversationId: string,
-  userMessage: string
+  userMessage: string,
+  groupId?: string
 ): Promise<string> {
   addToHistory(conversationId, "user", userMessage);
 
@@ -19,6 +20,14 @@ export async function runAgent(
     ...getHistory(conversationId),
   ];
 
+  // Inject group ID as a separate system hint so GPT always has it available
+  if (groupId) {
+    messages.push({
+      role: "system",
+      content: `CONTEXT: The current group ID is "${groupId}". Use this for all tool calls that require a groupId parameter.`,
+    });
+  }
+
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const response = await openai.chat.completions.create({
@@ -26,7 +35,7 @@ export async function runAgent(
         messages,
         tools: toolDefinitions,
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 1200,
       });
 
       const choice = response.choices[0];
@@ -40,10 +49,17 @@ export async function runAgent(
         for (const toolCall of msg.tool_calls) {
           if (toolCall.type !== "function") continue;
           console.log(`Tool call: ${toolCall.function.name}(${toolCall.function.arguments})`);
-          const result = await executeTool(
-            toolCall.function.name,
-            toolCall.function.arguments
-          );
+          let result: string;
+          try {
+            result = await executeTool(
+              toolCall.function.name,
+              toolCall.function.arguments
+            );
+          } catch (toolErr) {
+            const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+            console.error(`Tool "${toolCall.function.name}" failed:`, errMsg);
+            result = JSON.stringify({ error: `Tool failed: ${errMsg}` });
+          }
           console.log(`Tool result: ${result.slice(0, 200)}`);
           messages.push({
             role: "tool",
