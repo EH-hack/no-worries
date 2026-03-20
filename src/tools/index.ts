@@ -5,6 +5,12 @@ import { getBalancesDef, recordPaymentDef, getGroupSummaryDef } from "./balanceT
 import { getBalances, recordPayment, getGroupSummary } from "./balanceTools";
 import { parseReceiptDef, parseReceipt, requestReceiptUploadDef, requestReceiptUpload } from "./receiptTools";
 import { findPlacesDef, findPlaces } from "./placeTools";
+import {
+  sendCryptoDef, sendCrypto,
+  checkBalanceDef, checkCryptoBalance,
+  fundUserDef, fundUser,
+  getWalletAddressDef, getWalletAddress,
+} from "./cryptoTools";
 
 export const toolDefinitions: ChatCompletionTool[] = [
   createBillDef,
@@ -17,6 +23,10 @@ export const toolDefinitions: ChatCompletionTool[] = [
   requestReceiptUploadDef,
   parseReceiptDef,
   findPlacesDef,
+  sendCryptoDef,
+  checkBalanceDef,
+  fundUserDef,
+  getWalletAddressDef,
 ];
 
 export async function executeTool(name: string, args: string): Promise<string> {
@@ -42,6 +52,14 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return requestReceiptUpload(parsed);
     case "find_places":
       return findPlaces(parsed);
+    case "send_crypto":
+      return sendCrypto(parsed);
+    case "check_crypto_balance":
+      return checkCryptoBalance(parsed);
+    case "fund_user":
+      return fundUser(parsed);
+    case "get_wallet_address":
+      return getWalletAddress(parsed);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }

@@ -9,6 +9,7 @@
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
+    "@endlesslab/endless-ts-sdk": "^1.0.7",
     "@types/multer": "^2.1.0",
     "axios": "^1.7.2",
     "dotenv": "^17.3.1",
