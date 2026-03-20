@@ -123,7 +123,8 @@ function formatPlaceResults(places: GeoapifyPlace[]): string {
         .filter((c) => !c.startsWith("building") && !c.startsWith("commercial"))
         .slice(0, 2)
         .join(", ");
-      return `${i + 1}. ${name}${dist}\n   ${cats}\n   📍 ${addr}`;
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + addr)}`;
+      return `${i + 1}. ${name}${dist}\n   ${cats}\n   📍 ${addr}\n   🗺️ ${mapsUrl}`;
     })
     .join("\n\n");
 }
