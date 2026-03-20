@@ -1,17 +1,55 @@
-# Voice Note Handler
+# Voice Note & Audio Upload System
 
-This tool detects and transcribes voice notes from Luffa messages using the ElevenLabs Speech-to-Text API.
+This system handles voice note transcription via an external upload portal, since Luffa doesn't recognize audio files in chat.
+
+## Architecture
+
+Instead of trying to handle audio files directly in Luffa (which doesn't support them), we use an **external upload portal** hosted on Railway:
+
+1. User asks in Luffa: "Can you transcribe this voice note?"
+2. Bot replies with a link: `https://your-app.railway.app/audio?group=GROUP_ID&user=USER_ID`
+3. User opens link → uploads audio file via web interface
+4. Server transcribes with ElevenLabs → sends result to Luffa group chat
+5. User returns to Luffa to see the transcription
 
 ## Features
 
-- Automatically detects voice notes based on URL file extensions
-- Downloads audio files from URLs
+- Web-based audio upload portal with drag & drop
 - Transcribes audio using ElevenLabs Speech-to-Text API (latest **scribe_v2** model)
-- Formats transcriptions for storage in conversation history
-- Handles errors gracefully with fallback messages
 - Supports 9+ audio formats (MP3, M4A, WAV, OGG, OPUS, AAC, FLAC, WebM, AMR)
-- Optional audio event tagging (e.g., [laughter], [music])
-- Automatic language detection (or manual specification)
+- Automatic language detection
+- Shows transcription preview before sending to group
+- Similar architecture to receipt upload system
+
+## Endpoints
+
+### GET `/audio`
+Serves the audio upload page
+
+**Query Parameters:**
+- `group` - Group ID from Luffa
+- `user` - User ID from Luffa
+
+**Example:**
+```
+https://your-app.railway.app/audio?group=group_123&user=user_456
+```
+
+### POST `/audio/upload`
+Handles audio file upload and transcription
+
+**Form Data:**
+- `audio` - Audio file (multipart/form-data)
+- `groupId` - Group ID
+- `userId` - User ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "transcription": "This is what the user said in the voice note..."
+}
+```
 
 ## Setup
 
@@ -21,7 +59,7 @@ This tool detects and transcribes voice notes from Luffa messages using the Elev
 npm install
 ```
 
-This will install the required `form-data` package added to `package.json`.
+This will install the required `form-data` and `multer` packages.
 
 ### 2. Add ElevenLabs API Key
 
@@ -48,124 +86,129 @@ The handler automatically detects the following audio file formats:
 
 ## Usage
 
-The voice note handler is automatically integrated into the message processing pipeline in `src/index.ts`.
-
 ### How It Works
 
-1. **Detection**: When a message is received from Luffa, the handler checks if the `urlLink` field contains an audio file
-2. **Download**: If it's a voice note, the audio file is downloaded from the URL
-3. **Transcription**: The audio is sent to ElevenLabs Speech-to-Text API
-4. **Storage**: The transcription is formatted and stored in conversation history
-5. **Response**: The AI agent processes the transcription just like a text message
-
-### Example Flow
+Since Luffa doesn't support audio files in chat, the bot provides a link to an external upload portal:
 
 ```
-User sends voice note → Luffa provides URL
+User: "Can you transcribe my voice note?"
                       ↓
-Handler detects audio extension (.mp3, .m4a, etc.)
+Bot: "Upload your audio here: https://app.railway.app/audio?group=xyz&user=abc"
                       ↓
-Downloads audio from URL
+User clicks link → Opens upload page
                       ↓
-Sends to ElevenLabs API for transcription
+User uploads audio file (drag & drop or file picker)
                       ↓
-Receives: "Let's split the bill for dinner tonight"
+Server receives file → Sends to ElevenLabs API
                       ↓
-Formats as: "[Voice Note from user_123]: Let's split the bill for dinner tonight"
+ElevenLabs returns transcription
                       ↓
-Stores in conversation history
+Server sends to Luffa group: "🎤 Voice note from [user_123]: 'Let's split the bill!'"
                       ↓
-AI agent responds normally
+User sees transcription in group chat
+```
+
+### Generating Upload Links
+
+The bot should generate upload links dynamically when users request transcription. The link format is:
+
+```
+https://your-railway-url/audio?group=GROUP_ID&user=USER_ID
+```
+
+You can use Luffa's button feature (`sendGroupWithButton`) to make this even easier:
+
+```typescript
+await sendGroupWithButton(groupId, "Upload your voice note:", [
+  {
+    name: "Upload Audio",
+    selector: `https://your-app.railway.app/audio?group=${groupId}&user=${userId}`
+  }
+]);
 ```
 
 ## API Reference
 
-### `handleVoiceNote(urlLink: string | null): Promise<VoiceNoteResult>`
+### `handleAudioUpload(groupId, userId, audioBuffer, filename): Promise<string>`
 
-Main function to detect and transcribe voice notes.
-
-**Parameters:**
-- `urlLink` - The URL from Luffa message's `urlLink` field
-
-**Returns:**
-```typescript
-{
-  isVoiceNote: boolean;
-  transcription?: string;
-  error?: string;
-  audioUrl?: string;
-}
-```
-
-### `formatVoiceNoteForMemory(senderUid: string, transcription: string): string`
-
-Formats the transcription for storage in conversation history.
+Main function that processes uploaded audio and sends transcription to group.
 
 **Parameters:**
-- `senderUid` - User ID of the sender
-- `transcription` - Transcribed text
+- `groupId` - Luffa group ID
+- `userId` - User ID who uploaded the audio
+- `audioBuffer` - Audio file buffer from multer
+- `filename` - Original filename
 
 **Returns:**
-- Formatted string: `[Voice Note from {uid}]: {transcription}`
+- Promise resolving to the transcription text
 
-### `isVoiceNote(urlLink: string | null): boolean`
+**Throws:**
+- Error if transcription fails or API key is missing
 
-Checks if a URL points to an audio file.
+### `audioUploadHTML(groupId, userId): string`
+
+Generates the audio upload page HTML.
 
 **Parameters:**
-- `urlLink` - URL to check
+- `groupId` - Group ID to send transcription to
+- `userId` - User ID for attribution
 
 **Returns:**
-- `true` if the URL contains a recognized audio file extension
+- HTML string for the upload page
 
 ## Error Handling
 
 If transcription fails:
-- **DM**: Bot responds with "Sorry, I couldn't transcribe your voice note. Can you try again or type it out?"
-- **Group**: Bot responds with "Sorry, I couldn't transcribe that voice note. Can you try again?"
+- Server returns HTTP 500 with error message
+- Upload page shows error to user: "Error: [message] - try again?"
+- Bot sends error notification to group: "⚠️ Failed to transcribe voice note from [user]: [error]"
 - Error is logged to console for debugging
 
-## Integration in Message Handlers
+## File Upload Route
 
-The voice note handler is integrated in both DM and group message handlers:
+The audio upload is handled by a dedicated route in `src/index.ts`:
 
 ```typescript
-// DM Handler
-async function handleDM(senderUid: string, text: string, urlLink: string | null) {
-  const voiceNoteResult = await handleVoiceNote(urlLink);
+app.post("/audio/upload", upload.single("audio"), async (req, res) => {
+  const file = req.file;
+  const groupId = req.body?.groupId;
+  const userId = req.body?.userId;
 
-  if (voiceNoteResult.isVoiceNote && voiceNoteResult.transcription) {
-    // Use transcription instead of text
-    messageContent = formatVoiceNoteForMemory(senderUid, voiceNoteResult.transcription);
+  // Validate inputs
+  if (!file || !groupId) {
+    res.status(400).json({ success: false, error: "Missing required fields" });
+    return;
   }
-  // ... continue processing
-}
 
-// Group Message Handler
-async function handleGroupMessage(groupId: string, senderUid: string, text: string, urlLink: string | null) {
-  const voiceNoteResult = await handleVoiceNote(urlLink);
+  // Transcribe and send to group
+  const transcription = await handleAudioUpload(
+    groupId,
+    userId,
+    file.buffer,
+    file.originalname
+  );
 
-  if (voiceNoteResult.isVoiceNote && voiceNoteResult.transcription) {
-    // Use transcription instead of text
-    messageContent = voiceNoteResult.transcription;
-  }
-  // ... continue processing
-}
+  res.json({ success: true, transcription });
+});
 ```
 
 ## Limitations
 
-- Maximum file size depends on ElevenLabs API limits
-- Transcription timeout is set to 60 seconds
-- Download timeout is set to 30 seconds
+- Maximum file size: 10MB (configurable in multer setup)
+- Transcription timeout: 60 seconds
+- Requires users to leave Luffa temporarily to upload files
 - Only supports audio files (not video)
 - Requires active ElevenLabs API key with available credits
+- No authentication on upload portal (anyone with link can upload)
 
 ## Future Enhancements
 
-- Add support for different ElevenLabs models
-- Cache transcriptions to avoid re-processing
-- Add language detection/specification
-- Store original audio URLs for reference
-- Add duration tracking
+- Add authentication/session tokens to upload links
+- Support for different ElevenLabs models (selectable in UI)
+- Real-time transcription progress indicator
+- Cache transcriptions to avoid re-processing identical files
+- Language selection dropdown (currently auto-detects)
 - Support for video file audio extraction
+- Store uploaded audio files for playback in group
+- Batch upload support (multiple files at once)
+- Voice note recording directly in the web portal (no file upload needed)

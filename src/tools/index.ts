@@ -3,7 +3,7 @@ import { createBillDef, addItemsDef, setTaxAndTipDef, splitBillDef } from "./bil
 import { createBill, addItems, setTaxAndTip, splitBillFn } from "./billTools";
 import { getBalancesDef, recordPaymentDef, getGroupSummaryDef } from "./balanceTools";
 import { getBalances, recordPayment, getGroupSummary } from "./balanceTools";
-import { parseReceiptDef, parseReceipt } from "./receiptTools";
+import { parseReceiptDef, parseReceipt, requestReceiptUploadDef, requestReceiptUpload } from "./receiptTools";
 import { findPlacesDef, findPlaces } from "./placeTools";
 
 export const toolDefinitions: ChatCompletionTool[] = [
@@ -14,6 +14,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   getBalancesDef,
   recordPaymentDef,
   getGroupSummaryDef,
+  requestReceiptUploadDef,
   parseReceiptDef,
   findPlacesDef,
 ];
@@ -37,6 +38,8 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return getGroupSummary(parsed);
     case "parse_receipt":
       return parseReceipt(parsed);
+    case "request_receipt_upload":
+      return requestReceiptUpload(parsed);
     case "find_places":
       return findPlaces(parsed);
     default:
