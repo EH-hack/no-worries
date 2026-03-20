@@ -6,6 +6,11 @@ import { getBalances, recordPayment, getGroupSummary } from "./balanceTools";
 import { parseReceiptDef, parseReceipt, requestReceiptUploadDef, requestReceiptUpload } from "./receiptTools";
 import { findPlacesDef, findPlaces } from "./placeTools";
 import {
+  setLocationDef, setLocation,
+  findMeetingSpotDef, findMeetingSpot,
+  getLocationsDef, getLocations,
+} from "./locationTools";
+import {
   sendCryptoDef, sendCrypto,
   checkBalanceDef, checkCryptoBalance,
   fundUserDef, fundUser,
@@ -23,6 +28,9 @@ export const toolDefinitions: ChatCompletionTool[] = [
   requestReceiptUploadDef,
   parseReceiptDef,
   findPlacesDef,
+  setLocationDef,
+  findMeetingSpotDef,
+  getLocationsDef,
   sendCryptoDef,
   checkBalanceDef,
   fundUserDef,
@@ -52,6 +60,12 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return requestReceiptUpload(parsed);
     case "find_places":
       return findPlaces(parsed);
+    case "set_location":
+      return setLocation(parsed);
+    case "find_meeting_spot":
+      return findMeetingSpot(parsed);
+    case "get_locations":
+      return getLocations(parsed);
     case "send_crypto":
       return sendCrypto(parsed);
     case "check_crypto_balance":
