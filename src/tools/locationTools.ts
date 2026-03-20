@@ -1,6 +1,6 @@
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { ensureGroup, MemberLocation } from "../billing/types";
-import { loadState, saveState } from "../store";
+import { getState, saveState } from "../store";
 import { geocode, searchPlaces } from "./placeTools";
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ export async function setLocation(args: {
     });
   }
 
-  const state = loadState();
+  const state = getState();
   const group = ensureGroup(state, args.groupId);
   if (!group.locations[args.uid]) group.locations[args.uid] = {};
 
@@ -138,7 +138,7 @@ export async function setLocation(args: {
     loc.currentLon = coords.lon;
   }
 
-  saveState(state);
+  await saveState();
 
   const typeLabel = args.type === "home" ? "home location" : "current location";
   return JSON.stringify({
@@ -153,7 +153,7 @@ export async function findMeetingSpot(args: {
   members?: string[];
   limit?: number;
 }): Promise<string> {
-  const state = loadState();
+  const state = getState();
   const group = ensureGroup(state, args.groupId);
 
   // Resolve which members to include
@@ -219,7 +219,7 @@ export async function findMeetingSpot(args: {
 }
 
 export function getLocations(args: { groupId: string }): string {
-  const state = loadState();
+  const state = getState();
   const group = ensureGroup(state, args.groupId);
 
   const lines: string[] = [];

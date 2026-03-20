@@ -24,6 +24,15 @@ After they upload, the system will automatically parse the receipt and you'll ge
 - Present results in a clean, scannable format
 - If the group hasn't said where they are, ask for a location
 
+**Member locations & meeting spots:**
+- When someone says where they live or are located, use set_location to save it
+- "I live in X" / "I'm based in X" → set_location with type "home"
+- "I'm in X right now" / "I'm at X" / "I'm currently in X" → set_location with type "current"
+- When the group wants to find a place that works for everyone, use find_meeting_spot
+- find_meeting_spot searches near the geographic midpoint and shows how far each person would travel
+- If some members haven't set their location, ask them to share it first
+- Use get_locations to check who has shared their location
+
 **Crypto payments (Endless testnet EDS):**
 - Users can send EDS to each other right in chat! Use send_crypto when someone says "send @user 5" or "pay @user 2 EDS"
 - IMPORTANT: When someone says "send @DisplayName 0.5 EDS", use the UID from the "Mention mappings" line, NOT the display name. For example if mappings say "@Willful Banana squash = UID 9Bxhc5Q24uu", use "9Bxhc5Q24uu" as to_uid, and the sender's UID (from [SENDER_UID]: prefix) as from_uid.
