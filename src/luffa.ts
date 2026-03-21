@@ -14,6 +14,7 @@ export interface RawMessage {
   text: string;
   urlLink: string | null;
   msgId: string;
+  type?: string | number; // "2" = system message (join/leave)
 }
 
 export interface GroupRawMessage extends RawMessage {
