@@ -1,45 +1,31 @@
 import { sendGroup } from "./luffa";
-import axios from "axios";
-import FormData from "form-data";
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? "";
-const ELEVENLABS_STT_URL = "https://api.elevenlabs.io/v1/speech-to-text";
+// Initialize ElevenLabs client - automatically picks up ELEVENLABS_API_KEY from env
+const elevenlabs = new ElevenLabsClient();
 
 /**
  * Transcribes audio buffer using ElevenLabs Speech-to-Text API
  */
 async function transcribeAudio(audioBuffer: Buffer, filename: string): Promise<string> {
-  if (!ELEVENLABS_API_KEY) {
-    throw new Error("ELEVENLABS_API_KEY environment variable is not set");
-  }
-
   console.log(`🎤 Transcribing audio with ElevenLabs (size: ${audioBuffer.length} bytes)...`);
 
-  const formData = new FormData();
-  formData.append("file", audioBuffer, {
-    filename,
-    contentType: getContentType(filename),
+  // Convert Buffer to Blob for the SDK
+  const audioBlob = new Blob([audioBuffer], { type: getContentType(filename) });
+
+  const transcription = await elevenlabs.speechToText.convert({
+    file: audioBlob,
+    modelId: "scribe_v2", // Latest model for best accuracy
   });
 
-  // Use the latest scribe_v2 model for best accuracy
-  formData.append("model_id", "scribe_v2");
+  const text = transcription.text ?? "";
 
-  const response = await axios.post(ELEVENLABS_STT_URL, formData, {
-    headers: {
-      ...formData.getHeaders(),
-      "xi-api-key": ELEVENLABS_API_KEY,
-    },
-    timeout: 60000, // 60 second timeout for transcription
-  });
-
-  const transcription = response.data?.text ?? "";
-
-  if (!transcription) {
+  if (!text) {
     throw new Error("Empty transcription received from ElevenLabs");
   }
 
-  console.log(`✅ Transcription complete: "${transcription.substring(0, 100)}..."`);
-  return transcription;
+  console.log(`✅ Transcription complete: "${text.substring(0, 100)}..."`);
+  return text;
 }
 
 /**
