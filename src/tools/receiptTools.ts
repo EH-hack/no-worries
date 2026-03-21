@@ -34,18 +34,23 @@ export async function parseReceipt(args: { imageUrl: string }): Promise<string> 
           content: [
             {
               type: "text",
-              text: `You are a receipt parser. Extract all line items from this receipt image.
+              text: `You are extracting line items from a photo of a paper receipt. The image may be crumpled, rotated, or poorly lit — do your best.
 
 Return ONLY a valid JSON array — no markdown, no code fences, no explanation.
 
 Each object must have:
-- "name": item name (string)
-- "priceCents": price in cents as integer (e.g. $12.50 → 1250)
-- "quantity": number of that item (default 1)
+- "name": item name (string, cleaned up — no abbreviations if you can infer the full name)
+- "priceCents": unit price in cents as an integer (e.g. $12.50 = 1250). Use the per-item price, NOT the line total.
+- "quantity": number of that item (integer, default 1)
 
-Include tax and tip as separate items if visible (name them "Tax" and "Tip").
-
-IMPORTANT: If the receipt only shows a total without individual items, return a single item with name "Total" and the total amount. Never return an empty array — there is always at least a total.
+Rules:
+- Do NOT include subtotals, totals, balances due, or "amount due" lines — only individual items
+- Do NOT include the same item twice (watch out for subtotal lines that repeat item costs)
+- If you see "2x Coffee $3.00", that is quantity 2, priceCents 300 (per unit)
+- If there are discounts or vouchers, include them as a line item with a negative priceCents
+- Include tax and service charge as separate items named "Tax" and "Service Charge" if visible
+- If a price is ambiguous, make your best guess rather than omitting the item
+- IMPORTANT: If the receipt only shows a total without individual items, return a single item with name "Total" and the total amount. Never return an empty array.
 
 Example output with items:
 [{"name": "Margherita Pizza", "priceCents": 1499, "quantity": 1}, {"name": "Tax", "priceCents": 120, "quantity": 1}]
@@ -73,13 +78,23 @@ Example output with only a total:
     // Strip markdown code fences if present
     const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
 
+    const validate = (raw: any[]) =>
+      raw.filter(
+        (i) =>
+          typeof i.name === "string" &&
+          i.name.trim() !== "" &&
+          typeof i.priceCents === "number" &&
+          Math.abs(i.priceCents) < 1_000_000
+      );
+
     // Match the first JSON array (non-greedy)
     const jsonMatch = cleaned.match(/\[[\s\S]*?\](?=\s*$|\s*[^,\]\}])/);
     if (!jsonMatch) {
       // Try parsing the whole cleaned text as JSON
       try {
         const parsed = JSON.parse(cleaned);
-        const items = Array.isArray(parsed) ? parsed : parsed.items ?? [];
+        const raw = Array.isArray(parsed) ? parsed : parsed.items ?? [];
+        const items = validate(raw);
         console.log(`parseReceipt: parsed ${items.length} items (full-text parse)`);
         return JSON.stringify({ items });
       } catch {
@@ -88,7 +103,7 @@ Example output with only a total:
       }
     }
 
-    const items = JSON.parse(jsonMatch[0]);
+    const items = validate(JSON.parse(jsonMatch[0]));
     console.log(`parseReceipt: parsed ${items.length} items`);
     return JSON.stringify({ items });
   } catch (err) {
