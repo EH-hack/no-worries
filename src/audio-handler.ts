@@ -76,7 +76,7 @@ export async function handleAudioUpload(
     const agentReply = await runAgent(`group:${groupId}`, agentMessage, groupId);
 
     // Send agent's response to group
-    await sendGroup(groupId, agentReply);
+    if (agentReply) await sendGroup(groupId, agentReply);
 
     console.log(`✅ Voice note transcription and agent response sent to group ${groupId}`);
 

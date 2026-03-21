@@ -29,7 +29,30 @@ import {
 import { getTflRouteDef, getTflRoute } from "./tflTools";
 import { makeBookingDef, makeBooking } from "./bookingTools";
 
+// ─── No-reply tool (lets GPT skip responding) ───────────────────────────────
+export const noReplyDef: ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "no_reply",
+    description:
+      "Call this tool when the message does NOT need a response from the bot. Use it for messages between users that don't involve the bot, casual banter, reactions, or anything that the bot shouldn't butt into.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Brief reason for not replying (for logging only)",
+        },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
+export const NO_REPLY_SENTINEL = "__NO_REPLY__";
+
 export const toolDefinitions: ChatCompletionTool[] = [
+  noReplyDef,
   createBillDef,
   addItemsDef,
   setTaxAndTipDef,
@@ -112,6 +135,9 @@ export async function executeTool(name: string, args: string, groupId?: string):
       return showMap(parsed);
     case "make_booking":
       return makeBooking(parsed);
+    case "no_reply":
+      console.log(`No-reply: ${parsed.reason}`);
+      return NO_REPLY_SENTINEL;
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }

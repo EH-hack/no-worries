@@ -26,7 +26,7 @@ async function handleDM(senderUid: string, text: string, urlLink: string | null)
     ? `${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]`
     : text;
   const reply = await runAgent(`dm:${senderUid}`, message);
-  await sendDM(senderUid, reply);
+  if (reply) await sendDM(senderUid, reply);
 }
 
 async function handleGroupMessage(
@@ -73,7 +73,7 @@ async function handleGroupMessage(
     ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]${groupIdHint}`
     : `[${senderUid}]: ${text}${groupIdHint}`;
   const reply = await runAgent(`group:${groupId}`, message, groupId);
-  await sendGroup(groupId, reply);
+  if (reply) await sendGroup(groupId, reply);
 }
 
 // ─── Poll loop ────────────────────────────────────────────────────────────────

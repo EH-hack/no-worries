@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { CHATGPT_API_KEY, AI_PROVIDER, OPENROUTER_API_KEY, AI_MODEL } from "./config";
 import { SYSTEM_PROMPT } from "./prompt";
 import { getHistory, addToHistory } from "./history";
-import { toolDefinitions, executeTool } from "./tools";
+import { toolDefinitions, executeTool, NO_REPLY_SENTINEL } from "./tools";
 
 // ─── AI Client Setup (OpenAI or OpenRouter) ──────────────────────────────────
 const aiClient = AI_PROVIDER === "openrouter"
@@ -26,7 +26,7 @@ export async function runAgent(
   conversationId: string,
   userMessage: string,
   groupId?: string
-): Promise<string> {
+): Promise<string | null> {
   addToHistory(conversationId, "user", userMessage);
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
@@ -76,6 +76,12 @@ export async function runAgent(
             result = JSON.stringify({ error: `Tool failed: ${errMsg}` });
           }
           console.log(`Tool result: ${result.slice(0, 200)}`);
+
+          // If the model chose not to reply, exit immediately
+          if (result === NO_REPLY_SENTINEL) {
+            return null;
+          }
+
           messages.push({
             role: "tool",
             tool_call_id: toolCall.id,
