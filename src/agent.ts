@@ -16,7 +16,7 @@ const aiClient = AI_PROVIDER === "openrouter"
     })
   : new OpenAI({ apiKey: CHATGPT_API_KEY });
 
-const MODEL = AI_PROVIDER === "openrouter" ? AI_MODEL : "gpt-4o-mini";
+const MODEL = AI_PROVIDER === "openrouter" ? AI_MODEL : "gpt-4o";
 
 console.log(`🤖 AI Provider: ${AI_PROVIDER} | Model: ${MODEL}`);
 
