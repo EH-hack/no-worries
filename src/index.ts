@@ -12,6 +12,7 @@ import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
 import { handleAudioUpload } from "./audio-handler";
 import { handleBookingWebSocket } from "./booking-websocket";
+import { mapPageHTML, MapMember } from "./map-page";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -222,7 +223,6 @@ app.post("/audio/upload", upload.single("audio"), async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // ─── Booking TwiML endpoint ───────────────────────────────────────────────────
 app.post("/booking/twiml", (req, res) => {
   const callSid = req.body?.CallSid;
@@ -254,7 +254,6 @@ app.post("/booking/status", (req, res) => {
   console.log(`[BOOKING] Status update for call ${callSid}: ${callStatus}`);
   res.sendStatus(200);
 });
-=======
 // ─── Map page ─────────────────────────────────────────────────────────────────
 app.get("/map", (req, res) => {
   const groupId = (req.query.group as string) ?? "";
@@ -276,7 +275,6 @@ app.get("/map", (req, res) => {
   res.send(mapPageHTML(members));
 });
 
->>>>>>> 58966515db823f40e2259b602658be71c85f3fb3
 
 app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);

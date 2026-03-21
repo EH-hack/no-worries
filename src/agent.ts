@@ -1,10 +1,24 @@
 import OpenAI from "openai";
-import { CHATGPT_API_KEY } from "./config";
+import { CHATGPT_API_KEY, AI_PROVIDER, OPENROUTER_API_KEY, AI_MODEL } from "./config";
 import { SYSTEM_PROMPT } from "./prompt";
 import { getHistory, addToHistory } from "./history";
 import { toolDefinitions, executeTool } from "./tools";
 
-const openai = new OpenAI({ apiKey: CHATGPT_API_KEY });
+// ─── AI Client Setup (OpenAI or OpenRouter) ──────────────────────────────────
+const aiClient = AI_PROVIDER === "openrouter"
+  ? new OpenAI({
+      apiKey: OPENROUTER_API_KEY,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": "https://github.com/your-repo/no-worries", // Optional: for rankings
+        "X-Title": "No Worries Bot", // Optional: shows in OpenRouter dashboard
+      },
+    })
+  : new OpenAI({ apiKey: CHATGPT_API_KEY });
+
+const MODEL = AI_PROVIDER === "openrouter" ? AI_MODEL : "gpt-4o-mini";
+
+console.log(`🤖 AI Provider: ${AI_PROVIDER} | Model: ${MODEL}`);
 
 const MAX_TOOL_ROUNDS = 10;
 
@@ -30,8 +44,8 @@ export async function runAgent(
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+      const response = await aiClient.chat.completions.create({
+        model: MODEL,
         messages,
         tools: toolDefinitions,
         temperature: 0.7,
