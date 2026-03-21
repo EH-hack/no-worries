@@ -99,7 +99,20 @@ export async function clearHistory(conversationId: string): Promise<void> {
   }
 }
 
-export function clearAllHistory(): void {
+/**
+ * Clear ALL conversation history — both in-memory cache AND database.
+ */
+export async function clearAllHistory(): Promise<void> {
   cache.clear();
   loaded.clear();
+
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      await pool.query("DELETE FROM conversation_history");
+      console.log("Conversation history cleared from database");
+    } catch (err) {
+      console.error("Failed to clear conversation history from DB:", err instanceof Error ? err.message : err);
+    }
+  }
 }

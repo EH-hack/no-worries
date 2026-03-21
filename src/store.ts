@@ -308,21 +308,16 @@ export async function clearAllState(): Promise<void> {
 
   if (!DATABASE_URL) return;
 
+  // Delete each table independently so one failure doesn't prevent the rest
   const p = getPool();
-  const client = await p.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("DELETE FROM conversation_history");
-    await client.query("DELETE FROM group_members");
-    await client.query("DELETE FROM groups");
-    await client.query("DELETE FROM users");
-    await client.query("COMMIT");
-    console.log("All state cleared from database");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Failed to clear state:", err instanceof Error ? err.message : err);
-  } finally {
-    client.release();
+  const tables = ["group_members", "groups", "users"];
+  for (const table of tables) {
+    try {
+      await p.query(`DELETE FROM ${table}`);
+      console.log(`Cleared table: ${table}`);
+    } catch (err) {
+      console.error(`Failed to clear ${table}:`, err instanceof Error ? err.message : err);
+    }
   }
 }
 

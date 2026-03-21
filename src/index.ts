@@ -174,11 +174,15 @@ app.get("/debug/state", (_req, res) => {
 // ─── Reset endpoint (clears all state + history) ─────────────────────────────
 app.post("/reset", async (_req, res) => {
   try {
-    clearAllHistory();
-    await clearAllState();
+    // Block polling while we clear everything
+    polling = true;
+    await clearAllHistory(); // clears in-memory cache + DB conversation_history
+    await clearAllState();   // clears in-memory state + DB users/groups/group_members
     seenMsgIds.clear();
+    polling = false;
     res.json({ success: true, message: "All state, history, and dedup cache cleared" });
   } catch (err) {
+    polling = false;
     console.error("Reset error:", err);
     res.status(500).json({ success: false, error: "Failed to reset" });
   }
