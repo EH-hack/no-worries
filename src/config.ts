@@ -17,3 +17,13 @@ if (!CHATGPT_API_KEY) {
   console.error("CHATGPT_API_KEY env var is required");
   process.exit(1);
 }
+
+// Log master wallet on startup
+if (process.env.ENDLESS_MASTER_KEY) {
+  try {
+    const { Account, Ed25519PrivateKey } = require("@endlesslab/endless-ts-sdk");
+    const pk = new Ed25519PrivateKey(process.env.ENDLESS_MASTER_KEY);
+    const acct = Account.fromPrivateKey({ privateKey: pk });
+    console.log(`Master wallet address: ${acct.accountAddress.toBs58String?.() ?? acct.accountAddress.toString()}`);
+  } catch { /* ignore */ }
+}
