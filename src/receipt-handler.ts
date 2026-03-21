@@ -8,23 +8,31 @@ export async function parseReceiptFromBase64(
   dataUrl: string
 ): Promise<void> {
   // Step 1: Parse the receipt image with GPT-4o vision
+  console.log(`parseReceiptFromBase64: starting for group=${groupId} paidBy=${paidBy} imageSize=${Math.round(dataUrl.length / 1024)}KB`);
+
   const result = await parseReceipt({ imageUrl: dataUrl });
+  console.log(`parseReceiptFromBase64: parseReceipt returned: ${result.slice(0, 300)}`);
+
   const parsed = JSON.parse(result);
 
   if (parsed.error) {
-    await sendGroup(groupId, `Couldn't read that receipt - ${parsed.error}. Try a clearer photo?`);
+    console.error(`parseReceiptFromBase64: error from parser: ${parsed.error}`);
+    await sendGroup(groupId, `😕 Couldn't read that receipt — ${parsed.error}. Try a clearer photo?`);
     return;
   }
 
   if (!parsed.items || parsed.items.length === 0) {
-    await sendGroup(groupId, "I couldn't find any items on that receipt. Try a clearer photo?");
+    console.error("parseReceiptFromBase64: no items found in parsed result");
+    await sendGroup(groupId, "😕 I couldn't find any items on that receipt. Try a clearer photo or make sure the text is visible!");
     return;
   }
+
+  console.log(`parseReceiptFromBase64: found ${parsed.items.length} items`);
 
   // Step 2: Format items into a message and feed to the agent so it can
   // create the bill, add items, and offer to split
   const itemList = parsed.items
-    .map((item: any) => `- ${item.name}: $${(item.priceCents / 100).toFixed(2)} x${item.quantity ?? 1}`)
+    .map((item: any) => `${item.name}: $${(item.priceCents / 100).toFixed(2)} x${item.quantity ?? 1}`)
     .join("\n");
 
   const agentMessage = paidBy
