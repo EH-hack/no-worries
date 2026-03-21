@@ -34,9 +34,11 @@ async function handleGroupMessage(
   console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}" atList=${JSON.stringify(atList)}`);
 
   // Auto-save display names from mentions to user profiles
+  // Filter out the bot's own UID
+  const BOT_NAME = "no worries";
   const state = getState();
   for (const m of atList) {
-    if (m.did && m.name) {
+    if (m.did && m.name && m.name.toLowerCase() !== BOT_NAME) {
       if (!state.users[m.did]) {
         state.users[m.did] = { uid: m.did, registeredAt: new Date().toISOString() };
       }
@@ -129,6 +131,21 @@ app.get("/health", (_req, res) => {
 // Debug: view current state
 app.get("/state", async (_req, res) => {
   res.json(getState());
+});
+
+// Remove specific users from the store
+app.post("/remove-users", express.json(), async (req, res) => {
+  const uids: string[] = req.body?.uids ?? [];
+  const state = getState();
+  const removed: string[] = [];
+  for (const uid of uids) {
+    if (state.users[uid]) {
+      removed.push(`${state.users[uid].displayName ?? uid} (${uid})`);
+      delete state.users[uid];
+    }
+  }
+  await saveState();
+  res.json({ removed });
 });
 
 // Re-geocode all stored locations (fixes bad geocoding)
