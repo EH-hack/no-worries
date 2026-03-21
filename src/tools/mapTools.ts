@@ -1,7 +1,11 @@
+import axios from "axios";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { getState } from "../store";
 import { ensureGroup, MemberLocation } from "../billing/types";
 import { sendGroupWithLink } from "../luffa";
+
+
+
 
 const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY ?? "";
 
@@ -40,8 +44,18 @@ function getEffectiveLocation(
   return null;
 }
 
-// Geoapify marker colours — cycles through these for each member
 const MARKER_COLORS = ["red", "blue", "green", "orange", "purple", "darkblue"];
+
+async function shortenUrl(url: string): Promise<string> {
+  try {
+    const res = await axios.get(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`
+    );
+    return res.data;
+  } catch {
+    return url;
+  }
+}
 
 // ─── Tool implementation ──────────────────────────────────────────────────────
 
@@ -74,8 +88,7 @@ export async function showMap(args: { groupId: string }): Promise<string> {
   const markerParams = members
     .map((m, i) => {
       const color = MARKER_COLORS[i % MARKER_COLORS.length];
-      const label = encodeURIComponent(m.label.split(",")[0]); // first part of address
-      return `lonlat:${m.lon},${m.lat};color:${color};size:medium;text:${label}`;
+      return `lonlat:${m.lon},${m.lat};color:${color};size:medium`;
     })
     .join("|");
 
@@ -95,7 +108,8 @@ export async function showMap(args: { groupId: string }): Promise<string> {
     `&marker=${encodeURIComponent(markerParams)}` +
     `&apiKey=${GEOAPIFY_KEY}`;
 
-  // Send the map link into the group chat
+  const shortUrl = await shortenUrl(mapUrl);
+
   const memberList = members
     .map((m, i) => {
       const color = MARKER_COLORS[i % MARKER_COLORS.length];
@@ -106,12 +120,12 @@ export async function showMap(args: { groupId: string }): Promise<string> {
   await sendGroupWithLink(
     args.groupId,
     `📍 Here's where everyone is:\n\n${memberList}\n\nTap the link to see the map 🗺️`,
-    mapUrl
+    shortUrl
   );
 
   return JSON.stringify({
     success: true,
     memberCount: members.length,
-    mapUrl,
+    mapUrl: shortUrl,
   });
 }
