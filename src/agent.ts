@@ -53,7 +53,8 @@ export async function runAgent(
           try {
             result = await executeTool(
               toolCall.function.name,
-              toolCall.function.arguments
+              toolCall.function.arguments,
+              groupId
             );
           } catch (toolErr) {
             const errMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);

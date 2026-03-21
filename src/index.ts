@@ -45,7 +45,16 @@ async function handleGroupMessage(
       state.users[m.did].displayName = m.name;
     }
   }
-  if (atList.length > 0) await saveState();
+  // Auto-enroll sender as group member
+  const { ensureGroup } = await import("./billing/types");
+  const group = ensureGroup(state, groupId);
+  let needsSave = atList.length > 0;
+  if (!group.members.includes(senderUid)) {
+    group.members.push(senderUid);
+    needsSave = true;
+  }
+
+  if (needsSave) await saveState();
 
   // Build mention mapping so GPT knows display names → UIDs
   let mentionHint = "";
@@ -126,49 +135,6 @@ app.get("/", (_req, res) => {
 
 app.get("/health", (_req, res) => {
   res.json({ healthy: true });
-});
-
-// Debug: view current state
-app.get("/state", async (_req, res) => {
-  res.json(getState());
-});
-
-// Remove specific users from the store
-app.post("/remove-users", express.json(), async (req, res) => {
-  const uids: string[] = req.body?.uids ?? [];
-  const state = getState();
-  const removed: string[] = [];
-  for (const uid of uids) {
-    if (state.users[uid]) {
-      removed.push(`${state.users[uid].displayName ?? uid} (${uid})`);
-      delete state.users[uid];
-    }
-  }
-  await saveState();
-  res.json({ removed });
-});
-
-// Re-geocode all stored locations (fixes bad geocoding)
-app.post("/fix-locations", async (_req, res) => {
-  const { geocode } = await import("./tools/placeTools");
-  const state = getState();
-  const fixed: string[] = [];
-
-  for (const [groupId, group] of Object.entries(state.groups)) {
-    for (const [uid, loc] of Object.entries(group.locations || {})) {
-      if (loc.home) {
-        const coords = await geocode(loc.home);
-        if (coords) {
-          loc.homeLat = coords.lat;
-          loc.homeLon = coords.lon;
-          fixed.push(`${uid}: ${loc.home} -> ${coords.lat},${coords.lon}`);
-        }
-      }
-    }
-  }
-
-  await saveState();
-  res.json({ fixed });
 });
 
 // ─── Receipt upload page ──────────────────────────────────────────────────────

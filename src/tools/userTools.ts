@@ -1,5 +1,6 @@
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { getState, saveState } from "../store";
+import { ensureGroup } from "../billing/types";
 
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export async function registerUser(args: {
   display_name?: string;
   wallet_address?: string;
   location?: string;
+  groupId?: string;
 }): Promise<string> {
   const state = getState();
   const existing = state.users[args.uid];
@@ -87,6 +89,15 @@ export async function registerUser(args: {
   if (args.location) profile.location = args.location;
 
   state.users[args.uid] = profile;
+
+  // Auto-add user to group members if in group context
+  if (args.groupId) {
+    const group = ensureGroup(state, args.groupId);
+    if (!group.members.includes(args.uid)) {
+      group.members.push(args.uid);
+    }
+  }
+
   await saveState();
 
   console.log(`Registered user ${args.uid}:`, JSON.stringify(profile));
@@ -97,8 +108,21 @@ export async function registerUser(args: {
   });
 }
 
-export async function lookupUser(args: { uid: string }): Promise<string> {
+export async function lookupUser(args: { uid: string; groupId?: string }): Promise<string> {
   const state = getState();
+
+  // In group context, only allow looking up group members
+  if (args.groupId) {
+    const group = state.groups[args.groupId];
+    if (group && !group.members.includes(args.uid)) {
+      return JSON.stringify({
+        found: false,
+        uid: args.uid,
+        message: "User is not a member of this group.",
+      });
+    }
+  }
+
   const profile = state.users[args.uid];
 
   if (!profile) {
@@ -115,9 +139,19 @@ export async function lookupUser(args: { uid: string }): Promise<string> {
   });
 }
 
-export async function listUsers(): Promise<string> {
+export async function listUsers(args?: { groupId?: string }): Promise<string> {
   const state = getState();
-  const users = Object.values(state.users);
+
+  let users = Object.values(state.users);
+
+  // In group context, filter to only group members
+  if (args?.groupId) {
+    const group = state.groups[args.groupId];
+    if (group) {
+      const memberSet = new Set(group.members);
+      users = users.filter((u) => memberSet.has(u.uid));
+    }
+  }
 
   if (users.length === 0) {
     return JSON.stringify({

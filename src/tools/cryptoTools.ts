@@ -9,6 +9,18 @@ import {
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { getState } from "../store";
 
+// ─── Group membership guard ─────────────────────────────────────────────────
+function assertGroupMember(groupId: string | undefined, uid: string, label: string): string | null {
+  if (!groupId) return null; // DM context — allow
+  const state = getState();
+  const group = state.groups[groupId];
+  if (!group) return null; // group not created yet — allow
+  if (!group.members.includes(uid)) {
+    return JSON.stringify({ error: `${label}: user ${uid} is not a member of this group.` });
+  }
+  return null;
+}
+
 // ─── Endless config ──────────────────────────────────────────────────────────
 const MASTER_PRIVATE_KEY = process.env.ENDLESS_MASTER_KEY ?? "";
 if (!MASTER_PRIVATE_KEY) {
@@ -191,10 +203,16 @@ export async function sendCrypto(args: {
   from_uid: string;
   to_uid: string;
   amount: number;
+  groupId?: string;
 }): Promise<string> {
   if (!MASTER_PRIVATE_KEY) {
     return JSON.stringify({ error: "Crypto payments not configured" });
   }
+
+  const fromErr = assertGroupMember(args.groupId, args.from_uid, "send_crypto");
+  if (fromErr) return fromErr;
+  const toErr = assertGroupMember(args.groupId, args.to_uid, "send_crypto");
+  if (toErr) return toErr;
 
   try {
     const e = getEndless();
@@ -276,10 +294,13 @@ export async function sendCrypto(args: {
   }
 }
 
-export async function checkCryptoBalance(args: { uid: string }): Promise<string> {
+export async function checkCryptoBalance(args: { uid: string; groupId?: string }): Promise<string> {
   if (!MASTER_PRIVATE_KEY) {
     return JSON.stringify({ error: "Crypto payments not configured" });
   }
+
+  const err = assertGroupMember(args.groupId, args.uid, "check_crypto_balance");
+  if (err) return err;
 
   try {
     const e = getEndless();
@@ -305,10 +326,13 @@ export async function checkCryptoBalance(args: { uid: string }): Promise<string>
   }
 }
 
-export async function fundUser(args: { uid: string; amount?: number }): Promise<string> {
+export async function fundUser(args: { uid: string; amount?: number; groupId?: string }): Promise<string> {
   if (!MASTER_PRIVATE_KEY) {
     return JSON.stringify({ error: "Crypto payments not configured" });
   }
+
+  const err = assertGroupMember(args.groupId, args.uid, "fund_user");
+  if (err) return err;
 
   try {
     const e = getEndless();
@@ -347,7 +371,10 @@ export async function fundUser(args: { uid: string; amount?: number }): Promise<
   }
 }
 
-export async function getWalletAddress(args: { uid: string }): Promise<string> {
+export async function getWalletAddress(args: { uid: string; groupId?: string }): Promise<string> {
+  const err = assertGroupMember(args.groupId, args.uid, "get_wallet_address");
+  if (err) return err;
+
   const wallet = getOrCreateWallet(args.uid);
   return JSON.stringify({
     uid: args.uid,

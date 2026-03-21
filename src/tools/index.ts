@@ -51,8 +51,10 @@ export const toolDefinitions: ChatCompletionTool[] = [
   getTflRouteDef,
 ];
 
-export async function executeTool(name: string, args: string): Promise<string> {
+export async function executeTool(name: string, args: string, groupId?: string): Promise<string> {
   const parsed = JSON.parse(args);
+  // Override groupId with the verified value from the poll loop
+  if (groupId) parsed.groupId = groupId;
   switch (name) {
     case "create_bill":
       return createBill(parsed);
@@ -93,7 +95,7 @@ export async function executeTool(name: string, args: string): Promise<string> {
     case "lookup_user":
       return lookupUser(parsed);
     case "list_users":
-      return listUsers();
+      return listUsers(parsed);
     case "request_audio_upload":
       return requestAudioUpload(parsed);
     case "get_tfl_route":
