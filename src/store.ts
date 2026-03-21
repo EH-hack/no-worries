@@ -25,9 +25,15 @@ async function createTables(p: Pool): Promise<void> {
       display_name TEXT,
       wallet_address TEXT,
       location TEXT,
+      lat DOUBLE PRECISION,
+      lon DOUBLE PRECISION,
       registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  // Add lat/lon columns if upgrading from previous schema
+  await p.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
+  await p.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS lon DOUBLE PRECISION`);
 
   await p.query(`
     CREATE TABLE IF NOT EXISTS groups (
@@ -76,10 +82,10 @@ async function migrateFromAppState(p: Pool): Promise<void> {
     if (old.users) {
       for (const [uid, u] of Object.entries(old.users)) {
         await client.query(
-          `INSERT INTO users (uid, display_name, wallet_address, location, registered_at)
-           VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()))
+          `INSERT INTO users (uid, display_name, wallet_address, location, lat, lon, registered_at)
+           VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()))
            ON CONFLICT (uid) DO NOTHING`,
-          [uid, u.displayName ?? null, u.walletAddress ?? null, u.location ?? null, u.registeredAt ?? null]
+          [uid, u.displayName ?? null, u.walletAddress ?? null, u.location ?? null, (u as any).lat ?? null, (u as any).lon ?? null, u.registeredAt ?? null]
         );
       }
     }
@@ -170,13 +176,15 @@ export async function loadState(): Promise<void> {
     const s: AppState = newAppState();
 
     // Load users
-    const usersRes = await p.query("SELECT uid, display_name, wallet_address, location, registered_at FROM users");
+    const usersRes = await p.query("SELECT uid, display_name, wallet_address, location, lat, lon, registered_at FROM users");
     for (const row of usersRes.rows) {
       s.users[row.uid] = {
         uid: row.uid,
         displayName: row.display_name ?? undefined,
         walletAddress: row.wallet_address ?? undefined,
         location: row.location ?? undefined,
+        lat: row.lat ?? undefined,
+        lon: row.lon ?? undefined,
         registeredAt: row.registered_at?.toISOString() ?? new Date().toISOString(),
       };
     }
@@ -224,13 +232,15 @@ export async function saveState(): Promise<void> {
     // Upsert users
     for (const [uid, u] of Object.entries(s.users)) {
       await client.query(
-        `INSERT INTO users (uid, display_name, wallet_address, location, registered_at)
-         VALUES ($1, $2, $3, $4, COALESCE($5::timestamptz, NOW()))
+        `INSERT INTO users (uid, display_name, wallet_address, location, lat, lon, registered_at)
+         VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()))
          ON CONFLICT (uid) DO UPDATE SET
            display_name = EXCLUDED.display_name,
            wallet_address = EXCLUDED.wallet_address,
-           location = EXCLUDED.location`,
-        [uid, u.displayName ?? null, u.walletAddress ?? null, u.location ?? null, u.registeredAt ?? null]
+           location = EXCLUDED.location,
+           lat = EXCLUDED.lat,
+           lon = EXCLUDED.lon`,
+        [uid, u.displayName ?? null, u.walletAddress ?? null, u.location ?? null, u.lat ?? null, u.lon ?? null, u.registeredAt ?? null]
       );
     }
 
