@@ -3,7 +3,7 @@ import multer from "multer";
 import { PORT, POLL_INTERVAL_MS } from "./config";
 import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
-import { getState, saveState } from "./store";
+import { getState, saveState, loadState } from "./store";
 import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
@@ -207,8 +207,9 @@ app.post("/audio/upload", upload.single("audio"), async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);
+  await loadState();
   console.log(`Starting Luffa poll loop (every ${POLL_INTERVAL_MS}ms)`);
   setInterval(poll, POLL_INTERVAL_MS);
 });
