@@ -31,6 +31,6 @@ export async function parseReceiptFromBase64(
     ? `[SYSTEM]: A receipt was uploaded for this group. Paid by ${paidBy}.\n\nItems found:\n${itemList}\n\nPlease create a bill with these items and ask the group how they want to split it. Group ID for tool calls: ${groupId}`
     : `[SYSTEM]: A receipt was uploaded for this group.\n\nItems found:\n${itemList}\n\nPlease create a bill with these items. Ask who paid and how the group wants to split it. Group ID for tool calls: ${groupId}`;
 
-  const reply = await runAgent(`group:${groupId}`, agentMessage);
+  const reply = await runAgent(`group:${groupId}`, agentMessage, groupId);
   await sendGroup(groupId, reply);
 }

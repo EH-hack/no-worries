@@ -96,9 +96,16 @@ export async function requestReceiptUpload(args: {
 
   const uploadUrl = `${PUBLIC_URL}/receipt?${params.toString()}`;
 
+  // Send a clickable button directly to the group so users can tap to upload
+  await sendGroupWithButton(
+    args.groupId,
+    "📸 Tap below to upload your receipt!",
+    [{ name: "Upload Receipt", selector: uploadUrl }]
+  );
+
   return JSON.stringify({
     success: true,
     uploadUrl,
-    message: `Upload link generated. Tell the user to open this link to upload their receipt photo: ${uploadUrl}`,
+    message: "Upload link sent to the group as a clickable button. Tell the group to tap it to upload their receipt photo.",
   });
 }
