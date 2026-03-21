@@ -6,13 +6,14 @@ import type WebSocket from "ws";
 import { PORT, POLL_INTERVAL_MS } from "./config";
 import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
-import { getState, saveState, loadState } from "./store";
+import { getState, saveState, loadState, clearAllState } from "./store";
 import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
 import { MapMember, mapPageHTML } from "./map-page";
 import { handleAudioUpload } from "./audio-handler";
 import { handleBookingWebSocket } from "./booking-websocket";
+import { clearAllHistory } from "./history";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -146,6 +147,19 @@ app.get("/", (_req, res) => {
 
 app.get("/health", (_req, res) => {
   res.json({ healthy: true });
+});
+
+// ─── Reset endpoint (clears all state + history) ─────────────────────────────
+app.post("/reset", async (_req, res) => {
+  try {
+    clearAllHistory();
+    await clearAllState();
+    seenMsgIds.clear();
+    res.json({ success: true, message: "All state, history, and dedup cache cleared" });
+  } catch (err) {
+    console.error("Reset error:", err);
+    res.status(500).json({ success: false, error: "Failed to reset" });
+  }
 });
 
 // ─── Receipt upload page ──────────────────────────────────────────────────────

@@ -51,6 +51,20 @@ async function createTables(p: Pool): Promise<void> {
       PRIMARY KEY (group_id, user_uid)
     )
   `);
+
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS conversation_history (
+      id SERIAL PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await p.query(`
+    CREATE INDEX IF NOT EXISTS idx_conv_history_conv_id
+    ON conversation_history (conversation_id, id DESC)
+  `);
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,4 +291,40 @@ export async function saveState(): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reset all state (for testing / fresh start)                        */
+/* ------------------------------------------------------------------ */
+
+export async function clearAllState(): Promise<void> {
+  state = newAppState();
+
+  if (!DATABASE_URL) return;
+
+  const p = getPool();
+  const client = await p.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM conversation_history");
+    await client.query("DELETE FROM group_members");
+    await client.query("DELETE FROM groups");
+    await client.query("DELETE FROM users");
+    await client.query("COMMIT");
+    console.log("All state cleared from database");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Failed to clear state:", err instanceof Error ? err.message : err);
+  } finally {
+    client.release();
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Expose pool for other modules (history, etc.)                      */
+/* ------------------------------------------------------------------ */
+
+export { DATABASE_URL };
+export function getDbPool(): Pool | null {
+  return DATABASE_URL ? getPool() : null;
 }

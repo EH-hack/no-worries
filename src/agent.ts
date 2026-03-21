@@ -27,11 +27,11 @@ export async function runAgent(
   userMessage: string,
   groupId?: string
 ): Promise<string | null> {
-  addToHistory(conversationId, "user", userMessage);
+  await addToHistory(conversationId, "user", userMessage);
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
-    ...getHistory(conversationId),
+    ...(await getHistory(conversationId)),
   ];
 
   // Inject group ID as a separate system hint so GPT always has it available
@@ -93,13 +93,13 @@ export async function runAgent(
 
       // No tool calls — we have a final text response
       const reply = msg.content ?? "Hmm, I got nothing. Try again?";
-      addToHistory(conversationId, "assistant", reply);
+      await addToHistory(conversationId, "assistant", reply);
       return reply;
     }
 
     // Exceeded max rounds
     const fallback = "I got a bit carried away with calculations there. Here's what I found so far - could you try asking again?";
-    addToHistory(conversationId, "assistant", fallback);
+    await addToHistory(conversationId, "assistant", fallback);
     return fallback;
   } catch (err) {
     console.error("Agent error:", err instanceof Error ? err.message : err);
