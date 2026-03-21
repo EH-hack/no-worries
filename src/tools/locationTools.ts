@@ -156,15 +156,32 @@ export async function findMeetingSpot(args: {
   const state = getState();
   const group = ensureGroup(state, args.groupId);
 
-  // Resolve which members to include
-  const targetUids = args.members ?? Object.keys(group.locations);
+  // Resolve which members to include — check both group.locations AND users store
+  const allUidsWithLocation = new Set([
+    ...Object.keys(group.locations),
+    ...Object.keys(state.users).filter((uid) => state.users[uid].location),
+  ]);
+  const targetUids = args.members ?? [...allUidsWithLocation];
   const memberLocations: { uid: string; label: string; lat: number; lon: number }[] = [];
 
   for (const uid of targetUids) {
+    // First check group.locations
     const loc = group.locations[uid];
-    if (!loc) continue;
-    const eff = getEffectiveLocation(loc);
-    if (eff) memberLocations.push({ uid, ...eff });
+    if (loc) {
+      const eff = getEffectiveLocation(loc);
+      if (eff) {
+        memberLocations.push({ uid, ...eff });
+        continue;
+      }
+    }
+    // Fall back to users store — need to geocode the location string
+    const userProfile = state.users[uid];
+    if (userProfile?.location) {
+      const coords = await geocode(userProfile.location);
+      if (coords) {
+        memberLocations.push({ uid, label: userProfile.location, ...coords });
+      }
+    }
   }
 
   if (memberLocations.length < 2) {
@@ -204,7 +221,8 @@ export async function findMeetingSpot(args: {
     const distances = memberLocations
       .map((m) => {
         const km = haversineKm(m.lat, m.lon, place.lat, place.lon);
-        return `${m.uid}: ${km.toFixed(1)} km`;
+        const displayName = state.users[m.uid]?.displayName ?? m.uid;
+        return `${displayName}: ${km.toFixed(1)} km`;
       })
       .join(", ");
 
@@ -223,26 +241,25 @@ export function getLocations(args: { groupId: string }): string {
   const group = ensureGroup(state, args.groupId);
 
   const lines: string[] = [];
-  for (const uid of group.members) {
+  const seen = new Set<string>();
+
+  // Check group.locations (set via set_location)
+  for (const uid of Object.keys(group.locations)) {
+    seen.add(uid);
     const loc = group.locations[uid];
-    if (!loc) {
-      lines.push(`${uid}: not set`);
-      continue;
-    }
     const parts: string[] = [];
     if (loc.home) parts.push(`home: ${loc.home}`);
     if (loc.current) parts.push(`currently at: ${loc.current}`);
-    lines.push(`${uid}: ${parts.length > 0 ? parts.join(" | ") : "not set"}`);
+    const displayName = state.users[uid]?.displayName ?? uid;
+    if (parts.length > 0) lines.push(`${displayName} (${uid}): ${parts.join(" | ")}`);
   }
 
-  // Also show locations for UIDs not in members array (edge case)
-  for (const uid of Object.keys(group.locations)) {
-    if (!group.members.includes(uid)) {
-      const loc = group.locations[uid];
-      const parts: string[] = [];
-      if (loc.home) parts.push(`home: ${loc.home}`);
-      if (loc.current) parts.push(`currently at: ${loc.current}`);
-      if (parts.length > 0) lines.push(`${uid}: ${parts.join(" | ")}`);
+  // Also check users store (set via register_user)
+  for (const [uid, profile] of Object.entries(state.users)) {
+    if (seen.has(uid)) continue;
+    if (profile.location) {
+      const displayName = profile.displayName ?? uid;
+      lines.push(`${displayName} (${uid}): ${profile.location}`);
     }
   }
 

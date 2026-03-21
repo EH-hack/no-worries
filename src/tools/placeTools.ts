@@ -52,7 +52,7 @@ interface GeoapifyPlace {
 export async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
   try {
     const res = await axios.get("https://api.geoapify.com/v1/geocode/search", {
-      params: { text: location, apiKey: GEOAPIFY_KEY, limit: 1 },
+      params: { text: location, apiKey: GEOAPIFY_KEY, limit: 1, bias: "proximity:51.5074,-0.1278" },
     });
     const feature = res.data?.features?.[0];
     if (!feature) return null;
