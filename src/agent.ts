@@ -6,7 +6,7 @@ import { toolDefinitions, executeTool } from "./tools";
 
 const openai = new OpenAI({ apiKey: CHATGPT_API_KEY });
 
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = 10; // max agentic loop iterations
 
 export async function runAgent(
   conversationId: string,
