@@ -1,7 +1,7 @@
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { ensureGroup, MemberLocation } from "../billing/types";
 import { getState, saveState } from "../store";
-import { geocode, searchPlaces } from "./placeTools";
+import { geocode, searchPlaces, reverseGeocode } from "./placeTools";
 import { getJourneyMinutes } from "./tflTools";
 import { TFL_API_KEY } from "../config";
 
@@ -214,9 +214,11 @@ export async function findMeetingSpot(args: {
   const midLon = rawMidLon * (1 - bias) + CENTRAL_LONDON.lon * bias;
 
   // Search near the midpoint using the location string form
-  const midpointLabel = `${midLat.toFixed(5)},${midLon.toFixed(5)}`;
+  const midpointCoords = `${midLat.toFixed(5)},${midLon.toFixed(5)}`;
+  const midpointBorough = await reverseGeocode(midLat, midLon);
+  const midpointLabel = midpointBorough ?? midpointCoords;
   const limit = Math.min(Math.max(args.limit ?? 5, 1), 10);
-  const results = await searchPlaces(args.term, midpointLabel, limit);
+  const results = await searchPlaces(args.term, midpointCoords, limit);
 
   if (results.length === 0) {
     return JSON.stringify({
