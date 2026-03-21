@@ -8,6 +8,7 @@ import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
 import { handleAudioUpload } from "./audio-handler";
+import { getWeatherDef, getWeather } from "./weatherTools";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
