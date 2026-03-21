@@ -154,6 +154,23 @@ app.get("/health", (_req, res) => {
   res.json({ healthy: true });
 });
 
+// ─── Debug endpoint (show current in-memory state) ──────────────────────────
+app.get("/debug/state", (_req, res) => {
+  const s = getState();
+  res.json({
+    groupCount: Object.keys(s.groups).length,
+    userCount: Object.keys(s.users).length,
+    groups: Object.fromEntries(
+      Object.entries(s.groups).map(([gid, g]) => [gid, {
+        members: g.members,
+        billCount: g.bills.length,
+        bills: g.bills.map(b => ({ id: b.id, desc: b.description, paidBy: b.paidBy, finalized: b.finalized })),
+        debts: g.debts.map(d => ({ from: d.from, to: d.to, amount: `$${(d.amountCents / 100).toFixed(2)}` })),
+      }])
+    ),
+  });
+});
+
 // ─── Reset endpoint (clears all state + history) ─────────────────────────────
 app.post("/reset", async (_req, res) => {
   try {
