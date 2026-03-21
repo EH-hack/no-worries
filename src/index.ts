@@ -46,11 +46,11 @@ async function handleGroupMessage(
       state.users[m.did].displayName = m.name;
     }
   }
-  // Auto-enroll sender as group member
+  // Auto-enroll sender as group member (but never the group ID itself)
   const { ensureGroup } = await import("./billing/types");
   const group = ensureGroup(state, groupId);
   let needsSave = atList.length > 0;
-  if (!group.members.includes(senderUid)) {
+  if (senderUid !== groupId && senderUid !== "unknown" && !group.members.includes(senderUid)) {
     group.members.push(senderUid);
     needsSave = true;
   }
@@ -97,6 +97,12 @@ async function poll(): Promise<void> {
         if (seenMsgIds.size > 5000) {
           const first = seenMsgIds.values().next().value;
           if (first) seenMsgIds.delete(first);
+        }
+
+        // Skip system messages (join/leave notifications, type "2")
+        if (parsed.type === "2" || parsed.type === 2) {
+          console.log("Skipping system message:", parsed.text);
+          continue;
         }
 
         const text = parsed.text ?? "";
