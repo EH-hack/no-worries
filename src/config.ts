@@ -13,7 +13,7 @@ export const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? "";
 export const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER ?? "";
 
 // ─── AI Provider Configuration ────────────────────────────────────────────────
-export const AI_PROVIDER = process.env.AI_PROVIDER ?? "openrouter"; // "openai" or "openrouter"
+export const AI_PROVIDER = process.env.AI_PROVIDER ?? "openai"; // "openai" or "openrouter"
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 export const AI_MODEL = process.env.AI_MODEL ?? "deepseek/deepseek-chat"; // Default to DeepSeek V3
 
