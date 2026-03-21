@@ -171,6 +171,37 @@ app.get("/debug/state", (_req, res) => {
   });
 });
 
+// ─── Debug: show conversation history from DB ───────────────────────────────
+app.get("/debug/history", async (_req, res) => {
+  const { getDbPool } = await import("./store");
+  const pool = getDbPool();
+  if (!pool) {
+    res.json({ error: "No DATABASE_URL configured" });
+    return;
+  }
+  try {
+    // Check if table exists
+    const tableCheck = await pool.query(`
+      SELECT 1 FROM information_schema.tables WHERE table_name = 'conversation_history'
+    `);
+    if (tableCheck.rows.length === 0) {
+      res.json({ error: "conversation_history table does NOT exist" });
+      return;
+    }
+    const count = await pool.query("SELECT COUNT(*) as cnt FROM conversation_history");
+    const sample = await pool.query(
+      "SELECT conversation_id, role, LEFT(content, 100) as content_preview, created_at FROM conversation_history ORDER BY id DESC LIMIT 20"
+    );
+    res.json({
+      tableExists: true,
+      totalRows: parseInt(count.rows[0].cnt),
+      recentEntries: sample.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ─── Reset endpoint (clears all state + history) ─────────────────────────────
 app.post("/reset", async (_req, res) => {
   try {
