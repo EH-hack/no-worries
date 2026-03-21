@@ -2,6 +2,8 @@ import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { ensureGroup, MemberLocation } from "../billing/types";
 import { getState, saveState } from "../store";
 import { geocode, searchPlaces } from "./placeTools";
+import { getJourneyMinutes } from "./tflTools";
+import { TFL_API_KEY } from "../config";
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
@@ -212,26 +214,68 @@ export async function findMeetingSpot(args: {
     });
   }
 
-  // Format results with per-member distances
-  const formatted = results.map((place, i) => {
+  // Score each venue — use TfL journey times if key is configured, else straight-line distance
+  const scored = await Promise.all(
+    results.map(async (place) => {
+      const toLatLon = `${place.lat},${place.lon}`;
+      const memberTimes = await Promise.all(
+        memberLocations.map(async (m) => ({
+          uid: m.uid,
+          lat: m.lat,
+          lon: m.lon,
+          minutes: TFL_API_KEY
+            ? await getJourneyMinutes(`${m.lat},${m.lon}`, toLatLon)
+            : null,
+        }))
+      );
+      const validMinutes = memberTimes.filter((t) => t.minutes !== null).map((t) => t.minutes as number);
+      const totalMinutes = validMinutes.length === memberTimes.length ? validMinutes.reduce((a, b) => a + b, 0) : null;
+      return { place, memberTimes, totalMinutes };
+    })
+  );
+
+  // Sort by total journey time if TfL data is available
+  if (TFL_API_KEY) {
+    scored.sort((a, b) => {
+      if (a.totalMinutes !== null && b.totalMinutes !== null) return a.totalMinutes - b.totalMinutes;
+      if (a.totalMinutes !== null) return -1;
+      if (b.totalMinutes !== null) return 1;
+      return 0;
+    });
+  }
+
+  const formatted = scored.map((item, i) => {
+    const { place, memberTimes, totalMinutes } = item;
     const name = place.name ?? "Unnamed";
     const addr = place.formatted ?? place.address_line2 ?? "";
     const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(name)}&near=${place.lat},${place.lon}`;
 
-    const distances = memberLocations
-      .map((m) => {
-        const km = haversineKm(m.lat, m.lon, place.lat, place.lon);
-        const displayName = state.users[m.uid]?.displayName ?? m.uid;
-        return `${displayName}: ${km.toFixed(1)} km`;
-      })
-      .join(", ");
+    let travelInfo: string;
+    if (totalMinutes !== null) {
+      const times = memberTimes.map((t) => {
+        const displayName = state.users[t.uid]?.displayName ?? t.uid;
+        return `${displayName}: ${t.minutes} min`;
+      }).join(", ");
+      travelInfo = `Journey times — ${times} (total: ${totalMinutes} min)`;
+    } else {
+      const distances = memberLocations
+        .map((m) => {
+          const km = haversineKm(m.lat, m.lon, place.lat, place.lon);
+          const displayName = state.users[m.uid]?.displayName ?? m.uid;
+          return `${displayName}: ${km.toFixed(1)} km`;
+        })
+        .join(", ");
+      travelInfo = `Distance — ${distances}`;
+    }
 
-    return `${i + 1}. ${name}\n   ${addr}\n   Distance — ${distances}\n   ${mapsUrl}`;
+    return `${i + 1}. ${name}\n   ${addr}\n   ${travelInfo}\n   ${mapsUrl}`;
   });
 
   return (
     `Midpoint: ${midpointLabel}\n` +
-    `Members: ${memberLocations.map((m) => `${m.uid} (${m.label})`).join(", ")}\n\n` +
+    `Members: ${memberLocations.map((m) => `${m.uid} (${m.label})`).join(", ")}\n` +
+    (TFL_API_KEY ? `Ranked by shortest total TfL journey time\n` : "") +
+    `\n` +
     formatted.join("\n\n")
   );
 }

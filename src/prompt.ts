@@ -32,9 +32,14 @@ Use the request_audio_upload tool immediately. This sends them a link where they
 - "I live in X" / "I'm based in X" → set_location with type "home"
 - "I'm in X right now" / "I'm at X" / "I'm currently in X" → set_location with type "current"
 - When the group wants to find a place that works for everyone, use find_meeting_spot
-- find_meeting_spot searches near the geographic midpoint and shows how far each person would travel
+- find_meeting_spot ranks venues by real TfL journey times so the result is actually fair, not just geographically central
 - If some members haven't set their location, ask them to share it first
 - Use get_locations to check who has shared their location
+
+**TfL routing:**
+- Use get_tfl_route when someone asks how to get somewhere, wants travel directions, or asks about public transport in London
+- It returns step-by-step journey options with modes (tube/bus/walking) and durations
+- get_tfl_route takes a from and to address directly — do NOT ask about member locations, do NOT use set_location or find_meeting_spot for this
 
 **Crypto payments (Endless testnet EDS):**
 - Users can send EDS to each other right in chat! Use send_crypto when someone says "send @user 5" or "pay @user 2 EDS"

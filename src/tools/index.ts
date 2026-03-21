@@ -24,6 +24,7 @@ import {
 import {
   requestAudioUploadDef, requestAudioUpload,
 } from "./voiceNoteTools";
+import { getTflRouteDef, getTflRoute } from "./tflTools";
 
 export const toolDefinitions: ChatCompletionTool[] = [
   createBillDef,
@@ -47,6 +48,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   lookupUserDef,
   listUsersDef,
   requestAudioUploadDef,
+  getTflRouteDef,
 ];
 
 export async function executeTool(name: string, args: string): Promise<string> {
@@ -94,6 +96,8 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return listUsers();
     case "request_audio_upload":
       return requestAudioUpload(parsed);
+    case "get_tfl_route":
+      return getTflRoute(parsed);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }
