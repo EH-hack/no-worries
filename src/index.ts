@@ -126,10 +126,32 @@ app.get("/health", (_req, res) => {
   res.json({ healthy: true });
 });
 
-// Debug: view current state (remove before production)
+// Debug: view current state
 app.get("/state", async (_req, res) => {
-  const { getState } = await import("./store");
   res.json(getState());
+});
+
+// Re-geocode all stored locations (fixes bad geocoding)
+app.post("/fix-locations", async (_req, res) => {
+  const { geocode } = await import("./tools/placeTools");
+  const state = getState();
+  const fixed: string[] = [];
+
+  for (const [groupId, group] of Object.entries(state.groups)) {
+    for (const [uid, loc] of Object.entries(group.locations || {})) {
+      if (loc.home) {
+        const coords = await geocode(loc.home);
+        if (coords) {
+          loc.homeLat = coords.lat;
+          loc.homeLon = coords.lon;
+          fixed.push(`${uid}: ${loc.home} -> ${coords.lat},${coords.lon}`);
+        }
+      }
+    }
+  }
+
+  await saveState();
+  res.json({ fixed });
 });
 
 // ─── Receipt upload page ──────────────────────────────────────────────────────
