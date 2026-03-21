@@ -217,7 +217,7 @@ export async function findMeetingSpot(args: {
   const midpointCoords = `${midLat.toFixed(5)},${midLon.toFixed(5)}`;
   const midpointBorough = await reverseGeocode(midLat, midLon);
   const midpointLabel = midpointBorough ?? midpointCoords;
-  const limit = Math.min(Math.max(args.limit ?? 5, 1), 10);
+  const limit = Math.min(Math.max(args.limit ?? 3, 1), 10);
   const results = await searchPlaces(args.term, midpointCoords, limit);
 
   if (results.length === 0) {
