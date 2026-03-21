@@ -20,7 +20,7 @@ const MODEL = AI_PROVIDER === "openrouter" ? AI_MODEL : "gpt-4o-mini";
 
 console.log(`🤖 AI Provider: ${AI_PROVIDER} | Model: ${MODEL}`);
 
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = 10; // max agentic loop iterations
 
 export async function runAgent(
   conversationId: string,

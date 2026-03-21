@@ -10,6 +10,7 @@ import { getState, saveState, loadState } from "./store";
 import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
+import { MapMember, mapPageHTML } from "./map-page";
 import { handleAudioUpload } from "./audio-handler";
 import { handleBookingWebSocket } from "./booking-websocket";
 import { mapPageHTML, MapMember } from "./map-page";
@@ -254,6 +255,10 @@ app.post("/booking/status", (req, res) => {
   console.log(`[BOOKING] Status update for call ${callSid}: ${callStatus}`);
   res.sendStatus(200);
 });
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5872c7ccd5af6526a60dd4cf6f2a3773f03ce73d
 // ─── Map page ─────────────────────────────────────────────────────────────────
 app.get("/map", (req, res) => {
   const groupId = (req.query.group as string) ?? "";
@@ -275,7 +280,10 @@ app.get("/map", (req, res) => {
   res.send(mapPageHTML(members));
 });
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5872c7ccd5af6526a60dd4cf6f2a3773f03ce73d
 app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);
   await loadState();
