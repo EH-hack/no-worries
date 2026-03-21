@@ -255,10 +255,6 @@ app.post("/booking/status", (req, res) => {
   console.log(`[BOOKING] Status update for call ${callSid}: ${callStatus}`);
   res.sendStatus(200);
 });
-<<<<<<< HEAD
-=======
-
->>>>>>> 5872c7ccd5af6526a60dd4cf6f2a3773f03ce73d
 // ─── Map page ─────────────────────────────────────────────────────────────────
 app.get("/map", (req, res) => {
   const groupId = (req.query.group as string) ?? "";
@@ -280,10 +276,6 @@ app.get("/map", (req, res) => {
   res.send(mapPageHTML(members));
 });
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 5872c7ccd5af6526a60dd4cf6f2a3773f03ce73d
 app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);
   await loadState();
