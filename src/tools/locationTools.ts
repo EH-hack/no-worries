@@ -257,17 +257,49 @@ export async function findMeetingSpot(args: {
     });
   }
 
+  const VENUE_EMOJI_MAP: [RegExp, string][] = [
+    [/\b(pub|inn|tavern|arms|head|oak|bull|lion|crown|anchor|horse|swan|fox|hound|dog|bear|eagle|feathers|bell|plough|wheat|barrel|cask|tap|ale|brew)\b/i, "🍺"],
+    [/\b(bar|lounge|cocktail|spirits)\b/i, "🍸"],
+    [/\b(pizza)\b/i, "🍕"],
+    [/\b(burger|grill|bbq|smokehouse)\b/i, "🍔"],
+    [/\b(sushi|japanese|ramen|noodle)\b/i, "🍣"],
+    [/\b(indian|curry|spice|masala)\b/i, "🍛"],
+    [/\b(chinese|dim sum|dumpling|wok)\b/i, "🥟"],
+    [/\b(cafe|coffee|espresso|roast)\b/i, "☕"],
+    [/\b(wine|vineyard|cellar|vino)\b/i, "🍷"],
+    [/\b(steak|chop|butcher)\b/i, "🥩"],
+    [/\b(fish|seafood|oyster|lobster|prawn|chip)\b/i, "🐟"],
+    [/\b(garden|park|green|meadow)\b/i, "🌿"],
+    [/\b(king|queen|royal|palace|castle|duke|prince|princess)\b/i, "👑"],
+    [/\b(dragon)\b/i, "🐉"],
+    [/\b(rose)\b/i, "🌹"],
+    [/\b(star|stellar)\b/i, "⭐"],
+    [/\b(moon|lunar)\b/i, "🌙"],
+    [/\b(sun|solar)\b/i, "☀️"],
+  ];
+
+  function venueEmoji(name: string): string {
+    for (const [pattern, emoji] of VENUE_EMOJI_MAP) {
+      if (pattern.test(name)) return emoji;
+    }
+    return "";
+  }
+
   const formatted = scored.map((item, i) => {
     const { place, memberTimes, totalMinutes } = item;
-    const name = place.name ?? "Unnamed";
+    const rawName = place.name ?? "Unnamed";
+    const emoji = venueEmoji(rawName);
+    const name = emoji ? `${rawName} ${emoji}` : rawName;
     const addr = place.formatted ?? place.address_line2 ?? "";
-    const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(name)}&near=${place.lat},${place.lon}`;
+    const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(rawName)}&near=${place.lat},${place.lon}`;
 
     let travelInfo: string;
     if (totalMinutes !== null) {
+      const minTime = Math.min(...memberTimes.filter(t => t.minutes !== null).map(t => t.minutes as number));
       const times = memberTimes.map((t) => {
         const displayName = state.users[t.uid]?.displayName ?? t.uid;
-        return `${displayName}: ${t.minutes} min`;
+        const fastest = t.minutes === minTime ? " 🏆" : "";
+        return `${displayName}: ${t.minutes} min${fastest}`;
       }).join(", ");
       travelInfo = `Journey times — ${times} (total: ${totalMinutes} min)`;
     } else {
