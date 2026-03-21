@@ -1,4 +1,8 @@
 import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, PUBLIC_URL } from "../config";
+import twilio from "twilio";
+
+// ─── Twilio Client ────────────────────────────────────────────────────────────
+const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,25 +27,6 @@ export async function initiateBookingCall(
   request: BookingRequest
 ): Promise<BookingCallResult> {
   console.log(`[BOOKING] Initiating call to ${request.phoneNumber} for ${request.venueName}`);
-
-  // TODO: Replace with real Twilio SDK integration
-  // For now, return placeholder response
-
-  // PLACEHOLDER: When implementing, use Twilio SDK like this:
-  // import twilio from 'twilio';
-  // const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-  //
-  // const call = await client.calls.create({
-  //   url: `${PUBLIC_URL}/booking/twiml`,
-  //   to: request.phoneNumber,
-  //   from: TWILIO_PHONE_NUMBER,
-  //   statusCallback: `${PUBLIC_URL}/booking/status`,
-  //   statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-  // });
-
-  const placeholderCallSid = `CA${Math.random().toString(36).substr(2, 32)}`;
-
-  console.log(`[BOOKING] Placeholder call created with SID: ${placeholderCallSid}`);
   console.log(`[BOOKING] Details:`, {
     venue: request.venueName,
     phone: request.phoneNumber,
@@ -51,10 +36,29 @@ export async function initiateBookingCall(
     special: request.specialRequests,
   });
 
-  return {
-    callSid: placeholderCallSid,
-    status: "initiated",
-  };
+  try {
+    // Create the Twilio call
+    const call = await twilioClient.calls.create({
+      url: `${PUBLIC_URL}/booking/twiml`,
+      to: request.phoneNumber,
+      from: TWILIO_PHONE_NUMBER,
+      statusCallback: `${PUBLIC_URL}/booking/status`,
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+    });
+
+    console.log(`[BOOKING] ✅ Real call created with SID: ${call.sid}`);
+
+    // Store booking context for when call connects
+    createBookingContext(call.sid, request);
+
+    return {
+      callSid: call.sid,
+      status: call.status,
+    };
+  } catch (error) {
+    console.error(`[BOOKING] ❌ Failed to create call:`, error);
+    throw new Error(`Failed to initiate Twilio call: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // ─── Generate TwiML for call flow ─────────────────────────────────────────────
