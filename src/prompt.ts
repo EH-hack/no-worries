@@ -33,6 +33,7 @@ Use the request_audio_upload tool immediately. This sends them a link where they
 - "I'm in X right now" / "I'm at X" / "I'm currently in X" → set_location with type "current"
 - When the group wants to find a place that works for everyone, use find_meeting_spot
 - find_meeting_spot ranks venues by real TfL journey times so the result is actually fair, not just geographically central
+- By default it biases the search 30% toward central London — if the user asks for somewhere "more central" use centralBias 0.6, if they want "very central" use 0.8
 - If some members haven't set their location, ask them to share it first
 - Use get_locations to check who has shared their location
 

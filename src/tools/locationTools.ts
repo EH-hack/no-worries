@@ -57,6 +57,11 @@ export const findMeetingSpotDef: ChatCompletionTool = {
           type: "number",
           description: "Number of results (1-10, default 5)",
         },
+        centralBias: {
+          type: "number",
+          description:
+            "How much to pull the search point toward central London (Charing Cross). 0 = pure geographic midpoint, 1 = central London only. Default 0.3. Use a higher value (e.g. 0.6) if the user asks for somewhere more central.",
+        },
       },
       required: ["groupId", "term"],
     },
@@ -149,11 +154,14 @@ export async function setLocation(args: {
   });
 }
 
+const CENTRAL_LONDON = { lat: 51.5081, lon: -0.1281 }; // Charing Cross
+
 export async function findMeetingSpot(args: {
   groupId: string;
   term: string;
   members?: string[];
   limit?: number;
+  centralBias?: number;
 }): Promise<string> {
   const state = getState();
   const group = ensureGroup(state, args.groupId);
@@ -197,10 +205,13 @@ export async function findMeetingSpot(args: {
   }
 
   // Compute geographic midpoint (average lat/lon)
-  const midLat =
-    memberLocations.reduce((sum, m) => sum + m.lat, 0) / memberLocations.length;
-  const midLon =
-    memberLocations.reduce((sum, m) => sum + m.lon, 0) / memberLocations.length;
+  const rawMidLat = memberLocations.reduce((sum, m) => sum + m.lat, 0) / memberLocations.length;
+  const rawMidLon = memberLocations.reduce((sum, m) => sum + m.lon, 0) / memberLocations.length;
+
+  // Blend toward central London
+  const bias = Math.min(Math.max(args.centralBias ?? 0.3, 0), 1);
+  const midLat = rawMidLat * (1 - bias) + CENTRAL_LONDON.lat * bias;
+  const midLon = rawMidLon * (1 - bias) + CENTRAL_LONDON.lon * bias;
 
   // Search near the midpoint using the location string form
   const midpointLabel = `${midLat.toFixed(5)},${midLon.toFixed(5)}`;
