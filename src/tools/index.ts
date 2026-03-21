@@ -21,6 +21,9 @@ import {
   fundUserDef, fundUser,
   getWalletAddressDef, getWalletAddress,
 } from "./cryptoTools";
+import {
+  requestAudioUploadDef, requestAudioUpload,
+} from "./voiceNoteTools";
 
 export const toolDefinitions: ChatCompletionTool[] = [
   createBillDef,
@@ -43,6 +46,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   registerUserDef,
   lookupUserDef,
   listUsersDef,
+  requestAudioUploadDef,
 ];
 
 export async function executeTool(name: string, args: string): Promise<string> {
@@ -88,6 +92,8 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return lookupUser(parsed);
     case "list_users":
       return listUsers();
+    case "request_audio_upload":
+      return requestAudioUpload(parsed);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }

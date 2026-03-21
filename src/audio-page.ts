@@ -19,16 +19,75 @@ export function audioUploadHTML(groupId: string, userId: string): string {
     }
     h1 { font-size: 24px; margin-bottom: 8px; }
     .subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
-    .upload-area {
+    .container {
       width: 100%;
       max-width: 400px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .action-btn {
+      flex: 1;
+      background: #1a1a2e;
+      color: #fff;
+      border: 2px solid #444;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .action-btn:hover { border-color: #9C27B0; }
+    .action-btn.active { background: #9C27B0; border-color: #9C27B0; }
+    .record-area {
+      width: 100%;
+      border: 2px dashed #444;
+      border-radius: 16px;
+      padding: 48px 24px;
+      text-align: center;
+      display: none;
+    }
+    .record-area.active { display: block; }
+    .record-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #9C27B0;
+      border: 4px solid #fff;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 0 auto;
+    }
+    .record-btn:hover { transform: scale(1.1); }
+    .record-btn.recording {
+      background: #f44336;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+      50% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
+    }
+    .record-time {
+      margin-top: 16px;
+      font-size: 24px;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+    .upload-area {
+      width: 100%;
       border: 2px dashed #444;
       border-radius: 16px;
       padding: 48px 24px;
       text-align: center;
       cursor: pointer;
       transition: border-color 0.2s;
+      display: none;
     }
+    .upload-area.active { display: block; }
     .upload-area:hover, .upload-area.dragover { border-color: #9C27B0; }
     .upload-area p { color: #aaa; margin-top: 12px; font-size: 14px; }
     .upload-icon { font-size: 48px; }
@@ -49,17 +108,19 @@ export function audioUploadHTML(groupId: string, userId: string): string {
       cursor: pointer;
       margin-top: 24px;
       width: 100%;
-      max-width: 400px;
       transition: opacity 0.2s;
     }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn:hover:not(:disabled) { opacity: 0.9; }
+    .btn.secondary {
+      background: #444;
+      margin-top: 12px;
+    }
     .status {
       margin-top: 24px;
       padding: 16px;
       border-radius: 12px;
       width: 100%;
-      max-width: 400px;
       text-align: center;
       font-size: 14px;
     }
@@ -81,36 +142,143 @@ export function audioUploadHTML(groupId: string, userId: string): string {
 </head>
 <body>
   <h1>No Worries</h1>
-  <p class="subtitle">Upload a voice note or audio recording</p>
+  <p class="subtitle">Record or upload a voice note</p>
 
-  <div class="upload-area" id="dropzone">
-    <div class="upload-icon">🎤</div>
-    <p>Tap to record or choose an audio file</p>
-    <input type="file" id="fileInput" accept="audio/*">
+  <div class="container">
+    <div class="action-buttons">
+      <button class="action-btn active" id="recordModeBtn">🎤 Record</button>
+      <button class="action-btn" id="uploadModeBtn">📁 Upload File</button>
+    </div>
+
+    <div class="record-area active" id="recordArea">
+      <div class="record-btn" id="recordBtn"></div>
+      <p class="record-time" id="recordTime">00:00</p>
+      <p style="color: #888; margin-top: 12px; font-size: 14px;">Tap to start recording</p>
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📁</div>
+      <p>Drag & drop or tap to choose an audio file</p>
+      <input type="file" id="fileInput" accept="audio/*">
+    </div>
+
+    <audio class="audio-player" id="audioPlayer" controls style="display:none"></audio>
+
+    <button class="btn" id="submitBtn" style="display:none">Transcribe Audio</button>
+    <button class="btn secondary" id="resetBtn" style="display:none">Start Over</button>
+
+    <div class="status" id="status" style="display:none"></div>
   </div>
-
-  <audio class="audio-player" id="audioPlayer" controls style="display:none"></audio>
-
-  <button class="btn" id="submitBtn" disabled>Transcribe Audio</button>
-
-  <div class="status" id="status" style="display:none"></div>
 
   <script>
     const groupId = ${JSON.stringify(groupId)};
     const userId = ${JSON.stringify(userId)};
-    const dropzone = document.getElementById('dropzone');
+
+    // DOM elements
+    const recordModeBtn = document.getElementById('recordModeBtn');
+    const uploadModeBtn = document.getElementById('uploadModeBtn');
+    const recordArea = document.getElementById('recordArea');
+    const uploadArea = document.getElementById('uploadArea');
+    const recordBtn = document.getElementById('recordBtn');
+    const recordTime = document.getElementById('recordTime');
     const fileInput = document.getElementById('fileInput');
     const audioPlayer = document.getElementById('audioPlayer');
     const submitBtn = document.getElementById('submitBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const status = document.getElementById('status');
+
+    // State
+    let currentMode = 'record';
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStart = null;
+    let timerInterval = null;
     let selectedFile = null;
 
-    dropzone.addEventListener('click', () => fileInput.click());
-    dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-    dropzone.addEventListener('drop', (e) => {
+    // Mode switching
+    recordModeBtn.addEventListener('click', () => switchMode('record'));
+    uploadModeBtn.addEventListener('click', () => switchMode('upload'));
+
+    function switchMode(mode) {
+      currentMode = mode;
+      if (mode === 'record') {
+        recordModeBtn.classList.add('active');
+        uploadModeBtn.classList.remove('active');
+        recordArea.classList.add('active');
+        uploadArea.classList.remove('active');
+      } else {
+        uploadModeBtn.classList.add('active');
+        recordModeBtn.classList.remove('active');
+        uploadArea.classList.add('active');
+        recordArea.classList.remove('active');
+      }
+      reset();
+    }
+
+    // Recording
+    recordBtn.addEventListener('click', async () => {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        await startRecording();
+      } else {
+        stopRecording();
+      }
+    });
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          audioPlayer.src = audioUrl;
+          audioPlayer.style.display = 'block';
+          submitBtn.style.display = 'block';
+          resetBtn.style.display = 'block';
+          selectedFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
+
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        recordBtn.classList.add('recording');
+        recordingStart = Date.now();
+        timerInterval = setInterval(updateTimer, 100);
+      } catch (err) {
+        alert('Microphone access denied. Please enable microphone permissions and try again.');
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        recordBtn.classList.remove('recording');
+        clearInterval(timerInterval);
+      }
+    }
+
+    function updateTimer() {
+      const elapsed = Date.now() - recordingStart;
+      const seconds = Math.floor(elapsed / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      recordTime.textContent = \`\${String(minutes).padStart(2, '0')}:\${String(secs).padStart(2, '0')}\`;
+    }
+
+    // File upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
-      dropzone.classList.remove('dragover');
+      uploadArea.classList.remove('dragover');
       if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
 
@@ -119,7 +287,6 @@ export function audioUploadHTML(groupId: string, userId: string): string {
     });
 
     function handleFile(file) {
-      // Check if it's an audio file
       if (!file.type.startsWith('audio/')) {
         alert('Please select an audio file');
         return;
@@ -130,12 +297,14 @@ export function audioUploadHTML(groupId: string, userId: string): string {
       reader.onload = (e) => {
         audioPlayer.src = e.target.result;
         audioPlayer.style.display = 'block';
-        dropzone.style.display = 'none';
-        submitBtn.disabled = false;
+        uploadArea.style.display = 'none';
+        submitBtn.style.display = 'block';
+        resetBtn.style.display = 'block';
       };
       reader.readAsDataURL(file);
     }
 
+    // Submit
     submitBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
       submitBtn.disabled = true;
@@ -156,6 +325,8 @@ export function audioUploadHTML(groupId: string, userId: string): string {
         if (data.success) {
           status.className = 'status success';
           status.innerHTML = \`✅ Transcribed!<br><br><strong>"\${data.transcription}"</strong><br><br>Sent to your group chat. You can close this page.\`;
+          submitBtn.style.display = 'none';
+          resetBtn.style.display = 'none';
         } else {
           throw new Error(data.error || 'Failed to transcribe audio');
         }
@@ -166,6 +337,30 @@ export function audioUploadHTML(groupId: string, userId: string): string {
         submitBtn.textContent = 'Transcribe Audio';
       }
     });
+
+    // Reset
+    resetBtn.addEventListener('click', reset);
+
+    function reset() {
+      selectedFile = null;
+      audioPlayer.style.display = 'none';
+      audioPlayer.src = '';
+      submitBtn.style.display = 'none';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Transcribe Audio';
+      resetBtn.style.display = 'none';
+      status.style.display = 'none';
+      recordTime.textContent = '00:00';
+      fileInput.value = '';
+
+      if (currentMode === 'upload') {
+        uploadArea.style.display = 'block';
+      }
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        stopRecording();
+      }
+    }
   </script>
 </body>
 </html>`;

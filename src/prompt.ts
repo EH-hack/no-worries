@@ -14,6 +14,9 @@ Use the request_receipt_upload tool immediately. This sends them a link where th
 
 After they upload, the system will automatically parse the receipt and you'll get the items to work with. Then create the bill and split it.
 
+**When someone wants to share a voice note:**
+Use the request_audio_upload tool immediately. This sends them a link where they can record or upload audio. If they mention wanting to send a voice note, record audio, or share a voice message, use request_audio_upload right away. The system will automatically transcribe the audio and send it to the group chat.
+
 **Balance tracking:**
 - Use get_balances to show who owes whom
 - Use record_payment when someone pays up
