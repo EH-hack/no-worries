@@ -45,6 +45,8 @@ export interface UserProfile {
   displayName?: string;
   walletAddress?: string;   // Endless wallet address
   location?: string;        // physical location / area
+  lat?: number;
+  lon?: number;
   registeredAt: string;
 }
 

@@ -49,6 +49,19 @@ interface GeoapifyPlace {
   distance?: number;
 }
 
+export async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  try {
+    const res = await axios.get("https://api.geoapify.com/v1/geocode/reverse", {
+      params: { lat, lon, apiKey: GEOAPIFY_KEY },
+    });
+    const props = res.data?.features?.[0]?.properties;
+    if (!props) return null;
+    return props.suburb ?? props.district ?? props.city ?? props.county ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function geocode(location: string): Promise<{ lat: number; lon: number } | null> {
   try {
     const res = await axios.get("https://api.geoapify.com/v1/geocode/search", {
