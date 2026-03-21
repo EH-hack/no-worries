@@ -3,11 +3,7 @@ import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { getState } from "../store";
 import { ensureGroup, MemberLocation } from "../billing/types";
 import { sendGroupWithLink } from "../luffa";
-
-
-
-
-const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY ?? "";
+import { PUBLIC_URL } from "../config";
 
 // ─── Tool definition ──────────────────────────────────────────────────────────
 
@@ -44,8 +40,6 @@ function getEffectiveLocation(
   return null;
 }
 
-const MARKER_COLORS = ["red", "blue", "green", "orange", "purple", "darkblue"];
-
 async function shortenUrl(url: string): Promise<string> {
   try {
     const res = await axios.get(
@@ -60,14 +54,9 @@ async function shortenUrl(url: string): Promise<string> {
 // ─── Tool implementation ──────────────────────────────────────────────────────
 
 export async function showMap(args: { groupId: string }): Promise<string> {
-  if (!GEOAPIFY_KEY) {
-    return JSON.stringify({ error: "GEOAPIFY_KEY not set — map unavailable" });
-  }
-
   const state = getState();
   const group = ensureGroup(state, args.groupId);
 
-  // Collect all members with known locations
   const members: { uid: string; label: string; lat: number; lon: number }[] = [];
 
   for (const uid of Object.keys(group.locations)) {
@@ -83,43 +72,16 @@ export async function showMap(args: { groupId: string }): Promise<string> {
     });
   }
 
-  // Build Geoapify Static Map URL
-  // Docs: https://apidocs.geoapify.com/docs/maps/static-maps/
-  const markerParams = members
-    .map((m, i) => {
-      const color = MARKER_COLORS[i % MARKER_COLORS.length];
-      return `lonlat:${m.lon},${m.lat};color:${color};size:medium`;
-    })
-    .join("|");
-
-  // Calculate a bounding box so the map fits all pins
-  const lats = members.map((m) => m.lat);
-  const lons = members.map((m) => m.lon);
-  const minLat = Math.min(...lats) - 0.02;
-  const maxLat = Math.max(...lats) + 0.02;
-  const minLon = Math.min(...lons) - 0.02;
-  const maxLon = Math.max(...lons) + 0.02;
-
-  const mapUrl =
-    `https://maps.geoapify.com/v1/staticmap` +
-    `?style=osm-bright` +
-    `&width=600&height=400` +
-    `&area=rect:${minLon},${minLat},${maxLon},${maxLat}` +
-    `&marker=${encodeURIComponent(markerParams)}` +
-    `&apiKey=${GEOAPIFY_KEY}`;
-
+  const mapUrl = `${PUBLIC_URL}/map?group=${encodeURIComponent(args.groupId)}`;
   const shortUrl = await shortenUrl(mapUrl);
 
   const memberList = members
-    .map((m, i) => {
-      const color = MARKER_COLORS[i % MARKER_COLORS.length];
-      return `${color} pin — ${m.label}`;
-    })
+    .map((m) => `📍 ${m.label}`)
     .join("\n");
 
   await sendGroupWithLink(
     args.groupId,
-    `📍 Here's where everyone is:\n\n${memberList}\n\nTap the link to see the map 🗺️`,
+    `🗺️ Here's where everyone is:\n\n${memberList}\n\nTap to see on the map 👇`,
     shortUrl
   );
 

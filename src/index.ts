@@ -222,6 +222,7 @@ app.post("/audio/upload", upload.single("audio"), async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // ─── Booking TwiML endpoint ───────────────────────────────────────────────────
 app.post("/booking/twiml", (req, res) => {
   const callSid = req.body?.CallSid;
@@ -253,6 +254,29 @@ app.post("/booking/status", (req, res) => {
   console.log(`[BOOKING] Status update for call ${callSid}: ${callStatus}`);
   res.sendStatus(200);
 });
+=======
+// ─── Map page ─────────────────────────────────────────────────────────────────
+app.get("/map", (req, res) => {
+  const groupId = (req.query.group as string) ?? "";
+  const state = getState();
+  const group = state.groups[groupId];
+  if (!group) {
+    res.status(404).send("Group not found");
+    return;
+  }
+  const members: MapMember[] = [];
+  for (const uid of Object.keys(group.locations ?? {})) {
+    const loc = group.locations[uid];
+    if (loc?.currentLat && loc?.currentLon) {
+      members.push({ uid, label: loc.current!, lat: loc.currentLat, lon: loc.currentLon });
+    } else if (loc?.homeLat && loc?.homeLon) {
+      members.push({ uid, label: loc.home!, lat: loc.homeLat, lon: loc.homeLon });
+    }
+  }
+  res.send(mapPageHTML(members));
+});
+
+>>>>>>> 58966515db823f40e2259b602658be71c85f3fb3
 
 app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);
