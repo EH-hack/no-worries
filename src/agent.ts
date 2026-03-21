@@ -18,7 +18,7 @@ const aiClient = AI_PROVIDER === "openrouter"
 
 const MODEL = AI_PROVIDER === "openrouter" ? AI_MODEL : "gpt-4o";
 
-console.log(`🤖 AI Provider: ${AI_PROVIDER} | Model: ${MODEL}`);
+console.log(`🤖 AI Provider: ${AI_PROVIDER} | Model: ${MODEL} | Key prefix: ${AI_PROVIDER === "openrouter" ? OPENROUTER_API_KEY?.slice(0, 8) : CHATGPT_API_KEY?.slice(0, 8)}...`);
 
 const MAX_TOOL_ROUNDS = 10; // max agentic loop iterations
 
