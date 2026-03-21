@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { CHATGPT_API_KEY, PUBLIC_URL } from "../config";
-import { sendGroupWithLink } from "../luffa";
+import { sendGroup } from "../luffa";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({ apiKey: CHATGPT_API_KEY });
@@ -143,16 +143,12 @@ export async function requestReceiptUpload(args: {
 
   const uploadUrl = `${PUBLIC_URL}/receipt?${params.toString()}`;
 
-  // Send the upload link directly as a clickable urlLink in the group chat
-  await sendGroupWithLink(
-    args.groupId,
-    "📸 Tap the link to upload your receipt!",
-    uploadUrl
-  );
+  // Send the link directly to the group as a plain message
+  await sendGroup(args.groupId, `📸 Upload your receipt here:\n${uploadUrl}`);
 
   return JSON.stringify({
     success: true,
     uploadUrl,
-    message: "Upload link sent to the group as a clickable link. Let them know to tap it to upload their receipt.",
+    message: "Upload link sent to the group. The link has already been sent — just let them know to tap it.",
   });
 }
