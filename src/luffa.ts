@@ -61,6 +61,19 @@ export async function sendGroup(groupId: string, text: string): Promise<void> {
   );
 }
 
+export async function sendGroupWithLink(
+  groupId: string,
+  text: string,
+  url: string
+): Promise<void> {
+  console.log(`Group link -> ${groupId}: ${text.slice(0, 80)}... url=${url}`);
+  await axios.post(
+    `${BASE_URL}/sendGroup`,
+    { secret: SECRET, uid: groupId, msg: JSON.stringify({ text, urlLink: url }), type: "1" },
+    { headers: { "Content-Type": "application/json" } }
+  );
+}
+
 export async function sendGroupWithButton(
   groupId: string,
   text: string,

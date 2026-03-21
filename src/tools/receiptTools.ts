@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { CHATGPT_API_KEY, PUBLIC_URL } from "../config";
-import { sendGroupWithButton } from "../luffa";
+import { sendGroupWithLink } from "../luffa";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({ apiKey: CHATGPT_API_KEY });
@@ -24,6 +24,8 @@ export const parseReceiptDef: ChatCompletionTool = {
 
 export async function parseReceipt(args: { imageUrl: string }): Promise<string> {
   try {
+    console.log(`parseReceipt: calling GPT-4o vision (image size: ${Math.round(args.imageUrl.length / 1024)}KB base64)`);
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -32,36 +34,66 @@ export async function parseReceipt(args: { imageUrl: string }): Promise<string> 
           content: [
             {
               type: "text",
-              text: `Extract all line items from this receipt. Return ONLY a JSON array of objects with these fields:
-- name: item name (string)
-- priceCents: price in cents as an integer (e.g. $12.50 = 1250)
-- quantity: number of that item (default 1)
+              text: `You are a receipt parser. Extract all line items from this receipt image.
 
-Also include tax and tip as separate items if visible (name them "Tax" and "Tip").
+Return ONLY a valid JSON array — no markdown, no code fences, no explanation.
 
-Example: [{"name": "Margherita Pizza", "priceCents": 1499, "quantity": 1}]
+Each object must have:
+- "name": item name (string)
+- "priceCents": price in cents as integer (e.g. $12.50 → 1250)
+- "quantity": number of that item (default 1)
 
-Return ONLY the JSON array, no other text.`,
+Include tax and tip as separate items if visible (name them "Tax" and "Tip").
+
+IMPORTANT: If the receipt only shows a total without individual items, return a single item with name "Total" and the total amount. Never return an empty array — there is always at least a total.
+
+Example output with items:
+[{"name": "Margherita Pizza", "priceCents": 1499, "quantity": 1}, {"name": "Tax", "priceCents": 120, "quantity": 1}]
+
+Example output with only a total:
+[{"name": "Total", "priceCents": 3250, "quantity": 1}]`,
             },
             {
               type: "image_url",
-              image_url: { url: args.imageUrl },
+              image_url: { url: args.imageUrl, detail: "high" },
             },
           ],
         },
       ],
-      max_tokens: 1000,
+      max_tokens: 2000,
     });
 
-    const text = response.choices[0]?.message?.content ?? "[]";
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const items = JSON.parse(jsonMatch[0]);
-      return JSON.stringify({ items });
+    const text = response.choices[0]?.message?.content ?? "";
+    console.log(`parseReceipt: GPT-4o raw response: ${text.slice(0, 500)}`);
+
+    if (!text) {
+      return JSON.stringify({ items: [], error: "GPT-4o returned empty response" });
     }
-    return JSON.stringify({ items: [], error: "Could not parse receipt" });
+
+    // Strip markdown code fences if present
+    const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
+
+    // Match the first JSON array (non-greedy)
+    const jsonMatch = cleaned.match(/\[[\s\S]*?\](?=\s*$|\s*[^,\]\}])/);
+    if (!jsonMatch) {
+      // Try parsing the whole cleaned text as JSON
+      try {
+        const parsed = JSON.parse(cleaned);
+        const items = Array.isArray(parsed) ? parsed : parsed.items ?? [];
+        console.log(`parseReceipt: parsed ${items.length} items (full-text parse)`);
+        return JSON.stringify({ items });
+      } catch {
+        console.error(`parseReceipt: no JSON array found in response: ${cleaned.slice(0, 300)}`);
+        return JSON.stringify({ items: [], error: "Could not find items in GPT response" });
+      }
+    }
+
+    const items = JSON.parse(jsonMatch[0]);
+    console.log(`parseReceipt: parsed ${items.length} items`);
+    return JSON.stringify({ items });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    console.error(`parseReceipt: error: ${msg}`);
     return JSON.stringify({ error: `Failed to parse receipt: ${msg}` });
   }
 }
@@ -96,16 +128,16 @@ export async function requestReceiptUpload(args: {
 
   const uploadUrl = `${PUBLIC_URL}/receipt?${params.toString()}`;
 
-  // Send a clickable button directly to the group so users can tap to upload
-  await sendGroupWithButton(
+  // Send the upload link directly as a clickable urlLink in the group chat
+  await sendGroupWithLink(
     args.groupId,
-    "📸 Tap below to upload your receipt!",
-    [{ name: "Upload Receipt", selector: uploadUrl }]
+    "📸 Tap the link to upload your receipt!",
+    uploadUrl
   );
 
   return JSON.stringify({
     success: true,
     uploadUrl,
-    message: "Upload link sent to the group as a clickable button. Tell the group to tap it to upload their receipt photo.",
+    message: "Upload link sent to the group as a clickable link. Let them know to tap it to upload their receipt.",
   });
 }
