@@ -5,6 +5,7 @@ import { getBalancesDef, recordPaymentDef, getGroupSummaryDef } from "./balanceT
 import { getBalances, recordPayment, getGroupSummary } from "./balanceTools";
 import { parseReceiptDef, parseReceipt, requestReceiptUploadDef, requestReceiptUpload } from "./receiptTools";
 import { findPlacesDef, findPlaces } from "./placeTools";
+import { getWeatherDef, getWeather } from "./weatherTools";
 import {
   setLocationDef, setLocation,
   findMeetingSpotDef, findMeetingSpot,
@@ -37,6 +38,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   requestReceiptUploadDef,
   parseReceiptDef,
   findPlacesDef,
+  getWeatherDef,
   setLocationDef,
   findMeetingSpotDef,
   getLocationsDef,
@@ -76,6 +78,8 @@ export async function executeTool(name: string, args: string, groupId?: string):
       return requestReceiptUpload(parsed);
     case "find_places":
       return findPlaces(parsed);
+        case "get_weather":
+      return getWeather(parsed);
     case "set_location":
       return setLocation(parsed);
     case "find_meeting_spot":
