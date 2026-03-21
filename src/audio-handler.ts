@@ -1,5 +1,6 @@
 import { sendGroup } from "./luffa";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import { runAgent } from "./agent";
 
 // Initialize ElevenLabs client - automatically picks up ELEVENLABS_API_KEY from env
 const elevenlabs = new ElevenLabsClient();
@@ -60,13 +61,20 @@ export async function handleAudioUpload(
     // Transcribe the audio
     const transcription = await transcribeAudio(audioBuffer, filename);
 
-    // Format message for group
-    const message = `🎤 Voice note from [${userId}]:\n\n"${transcription}"`;
+    // Process transcription through the agent (just like a regular group message)
+    // This allows the bot to use tools based on the voice note content
+    const groupIdHint = `\n\nSender UID: ${userId}\nGroup ID for tool calls: ${groupId}`;
+    const agentMessage = `[${userId}]: ${transcription}${groupIdHint}`;
 
-    // Send to group chat
-    await sendGroup(groupId, message);
+    console.log(`🤖 Processing voice note through agent: "${transcription.substring(0, 80)}..."`);
 
-    console.log(`✅ Voice note processed and sent to group ${groupId}`);
+    // Run through agent - it can use tools like bill splitting, journey planning, etc.
+    const agentReply = await runAgent(`group:${groupId}`, agentMessage, groupId);
+
+    // Send agent's response to group
+    await sendGroup(groupId, agentReply);
+
+    console.log(`✅ Voice note processed and agent responded to group ${groupId}`);
 
     return transcription;
   } catch (error) {

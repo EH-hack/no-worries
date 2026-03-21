@@ -8,7 +8,7 @@ import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
 import { handleAudioUpload } from "./audio-handler";
-import { getWeatherDef, getWeather } from "./weatherTools";
+import { getWeatherDef, getWeather } from "./tools/weatherTools";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -19,7 +19,7 @@ const seenMsgIds = new Set<string>();
 async function handleDM(senderUid: string, text: string, urlLink: string | null): Promise<void> {
   console.log(`DM from ${senderUid}: text="${text}" urlLink="${urlLink}"`);
   const message = urlLink
-    ? `${text || "Here's an image"}\n\n[Shared image: ${urlLink}]`
+    ? `${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]`
     : text;
   const reply = await runAgent(`dm:${senderUid}`, message);
   await sendDM(senderUid, reply);
@@ -66,7 +66,7 @@ async function handleGroupMessage(
 
   const groupIdHint = `\n\nSender UID: ${senderUid}${mentionHint}\nGroup ID for tool calls: ${groupId}`;
   const message = urlLink
-    ? `[${senderUid}]: ${text || "Here's an image"}\n\n[Shared image: ${urlLink}]${groupIdHint}`
+    ? `[${senderUid}]: ${text || "Here's a receipt/image"}\n\n[Image URL: ${urlLink}]${groupIdHint}`
     : `[${senderUid}]: ${text}${groupIdHint}`;
   const reply = await runAgent(`group:${groupId}`, message, groupId);
   await sendGroup(groupId, reply);
