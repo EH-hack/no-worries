@@ -6,6 +6,7 @@ import { getBalances, recordPayment, getGroupSummary } from "./balanceTools";
 import { parseReceiptDef, parseReceipt, requestReceiptUploadDef, requestReceiptUpload } from "./receiptTools";
 import { findPlacesDef, findPlaces } from "./placeTools";
 import { getWeatherDef, getWeather } from "./weatherTools";
+import { showMapDef, showMap } from "./mapTools";
 import {
   setLocationDef, setLocation,
   findMeetingSpotDef, findMeetingSpot,
@@ -51,6 +52,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   listUsersDef,
   requestAudioUploadDef,
   getTflRouteDef,
+  showMapDef,
 ];
 
 export async function executeTool(name: string, args: string, groupId?: string): Promise<string> {
@@ -104,6 +106,8 @@ export async function executeTool(name: string, args: string, groupId?: string):
       return requestAudioUpload(parsed);
     case "get_tfl_route":
       return getTflRoute(parsed);
+    case "show_map":
+      return showMap(parsed);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }
