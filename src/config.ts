@@ -8,6 +8,9 @@ export const BASE_URL = "https://apibot.luffa.im/robot";
 export const MAX_HISTORY = 20;
 export const PUBLIC_URL = process.env.PUBLIC_URL ?? `http://localhost:${PORT}`;
 export const TFL_API_KEY = process.env.TFL_API_KEY ?? "";
+export const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID ?? "";
+export const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? "";
+export const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER ?? "";
 
 if (!SECRET) {
   console.error("LUFFA_SECRET env var is required");

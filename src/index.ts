@@ -1,5 +1,8 @@
 import express from "express";
 import multer from "multer";
+import expressWs from "express-ws";
+import type { Request } from "express";
+import type WebSocket from "ws";
 import { PORT, POLL_INTERVAL_MS } from "./config";
 import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
@@ -8,7 +11,7 @@ import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
 import { handleAudioUpload } from "./audio-handler";
-import { getWeatherDef, getWeather } from "./tools/weatherTools";
+import { handleBookingWebSocket } from "./booking-websocket";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -133,7 +136,7 @@ async function poll(): Promise<void> {
 }
 
 // ─── Express app ──────────────────────────────────────────────────────────────
-const app = express();
+const { app } = expressWs(express());
 app.use(express.json());
 
 app.get("/", (_req, res) => {
@@ -217,6 +220,38 @@ app.post("/audio/upload", upload.single("audio"), async (req, res) => {
     console.error("Audio upload error:", err);
     res.status(500).json({ success: false, error: "Failed to transcribe audio" });
   }
+});
+
+// ─── Booking TwiML endpoint ───────────────────────────────────────────────────
+app.post("/booking/twiml", (req, res) => {
+  const callSid = req.body?.CallSid;
+  console.log(`[BOOKING] TwiML request for call ${callSid}`);
+
+  // PLACEHOLDER: Get booking context from callSid
+  // For now, just return basic TwiML
+  res.type("text/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>Connecting to booking assistant</Say>
+  <Connect>
+    <Stream url="wss://${req.hostname}/booking/media/${callSid}" />
+  </Connect>
+</Response>`);
+});
+
+// ─── Booking WebSocket endpoint ───────────────────────────────────────────────
+app.ws("/booking/media/:callSid", (ws: WebSocket, req: Request) => {
+  const callSid = req.params.callSid;
+  console.log(`[BOOKING] WebSocket connection for call ${callSid}`);
+  handleBookingWebSocket(ws, callSid);
+});
+
+// ─── Booking status callback ──────────────────────────────────────────────────
+app.post("/booking/status", (req, res) => {
+  const callSid = req.body?.CallSid;
+  const callStatus = req.body?.CallStatus;
+  console.log(`[BOOKING] Status update for call ${callSid}: ${callStatus}`);
+  res.sendStatus(200);
 });
 
 app.listen(PORT, async () => {

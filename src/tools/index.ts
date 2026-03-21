@@ -27,6 +27,7 @@ import {
   requestAudioUploadDef, requestAudioUpload,
 } from "./voiceNoteTools";
 import { getTflRouteDef, getTflRoute } from "./tflTools";
+import { makeBookingDef, makeBooking } from "./bookingTools";
 
 export const toolDefinitions: ChatCompletionTool[] = [
   createBillDef,
@@ -53,6 +54,7 @@ export const toolDefinitions: ChatCompletionTool[] = [
   requestAudioUploadDef,
   getTflRouteDef,
   showMapDef,
+  makeBookingDef,
 ];
 
 export async function executeTool(name: string, args: string, groupId?: string): Promise<string> {
@@ -108,6 +110,8 @@ export async function executeTool(name: string, args: string, groupId?: string):
       return getTflRoute(parsed);
     case "show_map":
       return showMap(parsed);
+    case "make_booking":
+      return makeBooking(parsed);
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }
