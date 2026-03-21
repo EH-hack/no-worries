@@ -61,7 +61,11 @@ export async function handleAudioUpload(
     // Transcribe the audio
     const transcription = await transcribeAudio(audioBuffer, filename);
 
-    // Process transcription through the agent (just like a regular group message)
+    // First, post the transcription to the group
+    const transcriptionMessage = `🎤 Voice note from [${userId}]:\n\n"${transcription}"`;
+    await sendGroup(groupId, transcriptionMessage);
+
+    // Then process transcription through the agent (just like a regular group message)
     // This allows the bot to use tools based on the voice note content
     const groupIdHint = `\n\nSender UID: ${userId}\nGroup ID for tool calls: ${groupId}`;
     const agentMessage = `[${userId}]: ${transcription}${groupIdHint}`;
@@ -74,7 +78,7 @@ export async function handleAudioUpload(
     // Send agent's response to group
     await sendGroup(groupId, agentReply);
 
-    console.log(`✅ Voice note processed and agent responded to group ${groupId}`);
+    console.log(`✅ Voice note transcription and agent response sent to group ${groupId}`);
 
     return transcription;
   } catch (error) {
