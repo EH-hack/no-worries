@@ -78,7 +78,10 @@ async function handleGroupMessage(
 }
 
 // ─── Poll loop ────────────────────────────────────────────────────────────────
+let polling = false;
 async function poll(): Promise<void> {
+  if (polling) return; // skip if previous poll is still running
+  polling = true;
   try {
     const items = await fetchMessages();
 
@@ -134,6 +137,8 @@ async function poll(): Promise<void> {
     }
   } catch (err) {
     console.error("Poll error:", err instanceof Error ? err.message : err);
+  } finally {
+    polling = false;
   }
 }
 

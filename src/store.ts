@@ -238,7 +238,13 @@ export async function saveState(): Promise<void> {
 
   const s = getState();
   const p = getPool();
-  const client: PoolClient = await p.connect();
+  let client: PoolClient;
+  try {
+    client = await p.connect();
+  } catch (err) {
+    console.error("Failed to connect to Postgres for save:", err instanceof Error ? err.message : err);
+    return;
+  }
 
   try {
     await client.query("BEGIN");
