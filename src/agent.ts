@@ -31,7 +31,7 @@ export async function runAgent(
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages,
         tools: toolDefinitions,
         temperature: 0.7,
