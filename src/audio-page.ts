@@ -287,7 +287,11 @@ export function audioUploadHTML(groupId: string, userId: string): string {
     });
 
     function handleFile(file) {
-      if (!file.type.startsWith('audio/')) {
+      // Accept audio files AND webm files (MediaRecorder often labels audio as video/webm)
+      const isAudio = file.type.startsWith('audio/');
+      const isWebM = file.type.includes('webm') || file.name.endsWith('.webm');
+
+      if (!isAudio && !isWebM) {
         alert('Please select an audio file');
         return;
       }
