@@ -3,6 +3,7 @@ import multer from "multer";
 import { PORT, POLL_INTERVAL_MS } from "./config";
 import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
+import { getState, saveState } from "./store";
 import { receiptUploadHTML } from "./receipt-page";
 import { parseReceiptFromBase64 } from "./receipt-handler";
 import { audioUploadHTML } from "./audio-page";
@@ -31,6 +32,18 @@ async function handleGroupMessage(
   atList: AtMention[]
 ): Promise<void> {
   console.log(`Group [${groupId}] from ${senderUid}: text="${text}" urlLink="${urlLink}" atList=${JSON.stringify(atList)}`);
+
+  // Auto-save display names from mentions to user profiles
+  const state = getState();
+  for (const m of atList) {
+    if (m.did && m.name) {
+      if (!state.users[m.did]) {
+        state.users[m.did] = { uid: m.did, registeredAt: new Date().toISOString() };
+      }
+      state.users[m.did].displayName = m.name;
+    }
+  }
+  if (atList.length > 0) await saveState();
 
   // Build mention mapping so GPT knows display names → UIDs
   let mentionHint = "";
