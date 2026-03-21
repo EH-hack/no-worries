@@ -47,6 +47,7 @@ interface GeoapifyPlace {
   lon: number;
   place_id: string;
   distance?: number;
+  website?: string;
 }
 
 export async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
@@ -195,6 +196,7 @@ export async function searchPlaces(term: string, location: string, limit: number
       ...f.properties,
       lat: f.geometry.coordinates[1],
       lon: f.geometry.coordinates[0],
+      website: f.properties.website ?? f.properties.datasource?.raw?.website,
     }));
 
     // For specific terms, prefer name matches from category results
@@ -217,6 +219,12 @@ export async function searchPlaces(term: string, location: string, limit: number
   }
 }
 
+function bookingLink(place: GeoapifyPlace): string {
+  if (place.website) return place.website;
+  const query = encodeURIComponent((place.name ?? "") + " " + (place.address_line2 ?? "")).trim();
+  return `https://www.opentable.co.uk/s/?term=${query}`;
+}
+
 function formatPlaceResults(places: GeoapifyPlace[]): string {
   if (places.length === 0) return "No places found";
   return places
@@ -225,7 +233,8 @@ function formatPlaceResults(places: GeoapifyPlace[]): string {
       const addr = p.formatted ?? p.address_line2 ?? "";
       const dist = p.distance ? ` - ${Math.round(p.distance)}m away` : "";
       const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(name)}&near=${p.lat},${p.lon}`;
-      return `${i + 1}. ${name}${dist}\n   ${addr}\n   ${mapsUrl}`;
+      const booking = bookingLink(p);
+      return `${i + 1}. ${name}${dist}\n   ${addr}\n   Maps: ${mapsUrl}\n   Book: ${booking}`;
     })
     .join("\n\n");
 }

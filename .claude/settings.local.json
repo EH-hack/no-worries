@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(git commit:*)",
+      "WebSearch",
+      "Bash(railway logs:*)",
+      "Bash(node:*)"
+    ]
+  }
+}
