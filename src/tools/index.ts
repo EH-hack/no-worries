@@ -11,6 +11,11 @@ import {
   getLocationsDef, getLocations,
 } from "./locationTools";
 import {
+  registerUserDef, registerUser,
+  lookupUserDef, lookupUser,
+  listUsersDef, listUsers,
+} from "./userTools";
+import {
   sendCryptoDef, sendCrypto,
   checkBalanceDef, checkCryptoBalance,
   fundUserDef, fundUser,
@@ -35,6 +40,9 @@ export const toolDefinitions: ChatCompletionTool[] = [
   checkBalanceDef,
   fundUserDef,
   getWalletAddressDef,
+  registerUserDef,
+  lookupUserDef,
+  listUsersDef,
 ];
 
 export async function executeTool(name: string, args: string): Promise<string> {
@@ -74,6 +82,12 @@ export async function executeTool(name: string, args: string): Promise<string> {
       return fundUser(parsed);
     case "get_wallet_address":
       return getWalletAddress(parsed);
+    case "register_user":
+      return registerUser(parsed);
+    case "lookup_user":
+      return lookupUser(parsed);
+    case "list_users":
+      return listUsers();
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }

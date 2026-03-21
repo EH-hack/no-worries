@@ -4,8 +4,10 @@ import {
   Network,
   Account,
   Ed25519PrivateKey,
+  AccountAddress,
 } from "@endlesslab/endless-ts-sdk";
 import type { ChatCompletionTool } from "openai/resources/chat/completions";
+import { getState } from "../store";
 
 // ─── Endless config ──────────────────────────────────────────────────────────
 const MASTER_PRIVATE_KEY = process.env.ENDLESS_MASTER_KEY ?? "";
@@ -196,37 +198,76 @@ export async function sendCrypto(args: {
 
   try {
     const e = getEndless();
-    const fromWallet = getOrCreateWallet(args.from_uid);
-    const toWallet = getOrCreateWallet(args.to_uid);
-    const amountSmallest = Math.round(args.amount * 10 ** EDS_DECIMALS);
+    const state = getState();
+    const master = getMasterAccount();
 
-    // Auto-fund sender if they don't have enough
-    await ensureFunded(fromWallet, args.amount);
-    // Ensure receiver account exists on-chain (needs some EDS)
-    await ensureFunded(toWallet, 0);
+    // Check if recipient has a registered real wallet address
+    const recipientProfile = state.users[args.to_uid];
+    const recipientRealWallet = recipientProfile?.walletAddress;
 
-    const transaction = await e.transferEDS({
-      sender: fromWallet.account,
-      recipient: toWallet.account.accountAddress,
-      amount: amountSmallest,
-    });
+    if (recipientRealWallet) {
+      // Send directly from master wallet to recipient's real wallet
+      const amountSmallest = Math.round(args.amount * 10 ** EDS_DECIMALS);
+      const recipientAddr = AccountAddress.fromBs58String(recipientRealWallet);
 
-    const pending = await e.signAndSubmitTransaction({
-      signer: fromWallet.account,
-      transaction,
-    });
+      console.log(`Sending ${args.amount} EDS from master to real wallet ${recipientRealWallet}`);
 
-    await e.waitForTransaction({ transactionHash: pending.hash });
+      const transaction = await e.transferEDS({
+        sender: master,
+        recipient: recipientAddr,
+        amount: amountSmallest,
+      });
 
-    return JSON.stringify({
-      success: true,
-      from: args.from_uid,
-      to: args.to_uid,
-      amount: args.amount,
-      currency: "EDS",
-      txHash: pending.hash,
-      explorerUrl: `${EXPLORER_URL}/${fromWallet.address}?network=testnet`,
-    });
+      const pending = await e.signAndSubmitTransaction({
+        signer: master,
+        transaction,
+      });
+
+      await e.waitForTransaction({ transactionHash: pending.hash });
+
+      return JSON.stringify({
+        success: true,
+        from: args.from_uid,
+        to: args.to_uid,
+        amount: args.amount,
+        currency: "EDS",
+        recipientWallet: recipientRealWallet,
+        txHash: pending.hash,
+        explorerUrl: `${EXPLORER_URL}/${recipientRealWallet}?network=testnet`,
+      });
+    } else {
+      // No registered wallet — use bot-managed wallets
+      const fromWallet = getOrCreateWallet(args.from_uid);
+      const toWallet = getOrCreateWallet(args.to_uid);
+      const amountSmallest = Math.round(args.amount * 10 ** EDS_DECIMALS);
+
+      await ensureFunded(fromWallet, args.amount);
+      await ensureFunded(toWallet, 0);
+
+      const transaction = await e.transferEDS({
+        sender: fromWallet.account,
+        recipient: toWallet.account.accountAddress,
+        amount: amountSmallest,
+      });
+
+      const pending = await e.signAndSubmitTransaction({
+        signer: fromWallet.account,
+        transaction,
+      });
+
+      await e.waitForTransaction({ transactionHash: pending.hash });
+
+      return JSON.stringify({
+        success: true,
+        from: args.from_uid,
+        to: args.to_uid,
+        amount: args.amount,
+        currency: "EDS",
+        note: "Recipient has no registered wallet — sent to bot-managed wallet. Ask them to register their wallet address!",
+        txHash: pending.hash,
+        explorerUrl: `${EXPLORER_URL}/${toWallet.address}?network=testnet`,
+      });
+    }
   } catch (err) {
     console.error("Send crypto error:", err instanceof Error ? err.message : err);
     return JSON.stringify({

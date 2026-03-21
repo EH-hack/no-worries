@@ -113,6 +113,12 @@ app.get("/health", (_req, res) => {
   res.json({ healthy: true });
 });
 
+// Debug: view current state (remove before production)
+app.get("/state", async (_req, res) => {
+  const { getState } = await import("./store");
+  res.json(getState());
+});
+
 // ─── Receipt upload page ──────────────────────────────────────────────────────
 app.get("/receipt", (req, res) => {
   const groupId = (req.query.group as string) ?? "";

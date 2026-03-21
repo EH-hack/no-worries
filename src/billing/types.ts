@@ -40,12 +40,21 @@ export interface GroupState {
   locations: Record<string, MemberLocation>; // uid → location
 }
 
+export interface UserProfile {
+  uid: string;
+  displayName?: string;
+  walletAddress?: string;   // Endless wallet address
+  location?: string;        // physical location / area
+  registeredAt: string;
+}
+
 export interface AppState {
   groups: Record<string, GroupState>;
+  users: Record<string, UserProfile>;  // keyed by UID
 }
 
 export function newAppState(): AppState {
-  return { groups: {} };
+  return { groups: {}, users: {} };
 }
 
 export function ensureGroup(state: AppState, groupId: string): GroupState {
