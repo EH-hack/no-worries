@@ -30,13 +30,33 @@ export interface ReceiveItem {
 
 let pollCount = 0;
 
+export async function testConnection(): Promise<void> {
+  try {
+    console.log(`Testing Luffa API connection to ${BASE_URL}/receive ...`);
+    console.log(`Secret prefix: ${SECRET.slice(0, 8)}...`);
+    const res = await axios.post(
+      `${BASE_URL}/receive`,
+      { secret: SECRET },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    console.log(`Luffa API test: status=${res.status} isArray=${Array.isArray(res.data)} data=${JSON.stringify(res.data).slice(0, 200)}`);
+  } catch (err: any) {
+    console.error(`Luffa API test FAILED:`, err.response?.status, err.response?.data ?? err.message);
+  }
+}
+
 export async function fetchMessages(): Promise<ReceiveItem[]> {
   const res = await axios.post<ReceiveItem[]>(
     `${BASE_URL}/receive`,
     { secret: SECRET },
     { headers: { "Content-Type": "application/json" } }
   );
-  const items: ReceiveItem[] = Array.isArray(res.data) ? res.data : [];
+  if (!Array.isArray(res.data)) {
+    pollCount++;
+    console.error(`Poll #${pollCount} - Luffa API returned non-array (status ${res.status}):`, JSON.stringify(res.data));
+    return [];
+  }
+  const items: ReceiveItem[] = res.data;
   pollCount++;
   if (pollCount % 30 === 1 || items.length > 0) {
     console.log(`Poll #${pollCount} - items: ${items.length}`, items.length > 0 ? JSON.stringify(res.data) : "");

@@ -4,7 +4,7 @@ import expressWs from "express-ws";
 import type { Request } from "express";
 import type WebSocket from "ws";
 import { PORT, POLL_INTERVAL_MS } from "./config";
-import { fetchMessages, sendDM, sendGroup, RawMessage, GroupRawMessage, AtMention } from "./luffa";
+import { fetchMessages, sendDM, sendGroup, testConnection, RawMessage, GroupRawMessage, AtMention } from "./luffa";
 import { runAgent } from "./agent";
 import { getState, saveState, loadState, clearAllState } from "./store";
 import { receiptUploadHTML } from "./receipt-page";
@@ -350,6 +350,7 @@ app.get("/map", (req, res) => {
 app.listen(PORT, async () => {
   console.log(`Health-check server on port ${PORT}`);
   await loadState();
+  await testConnection();
   console.log(`Starting Luffa poll loop (every ${POLL_INTERVAL_MS}ms)`);
   setInterval(poll, POLL_INTERVAL_MS);
 });
