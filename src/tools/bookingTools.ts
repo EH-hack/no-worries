@@ -60,13 +60,10 @@ export async function makeBooking(args: {
     // If no phone number provided, look up from database
     let phoneNumber = args.phoneNumber;
     if (!phoneNumber) {
-      const lookedUp = await lookupVenuePhone(args.venueName);
-      if (!lookedUp) {
-        return JSON.stringify({
-          error: `Could not find phone number for ${args.venueName}. Please provide a phone number.`,
-        });
-      }
-      phoneNumber = lookedUp;
+      return JSON.stringify({
+        needs_phone_number: true,
+        message: `What's the phone number for ${args.venueName}? I'll call them straight away once I have it 📞`,
+      });
     }
 
     // Initiate the booking call
@@ -90,17 +87,4 @@ export async function makeBooking(args: {
     console.error(`makeBooking error: ${msg}`);
     return JSON.stringify({ error: `Failed to initiate booking call: ${msg}` });
   }
-}
-
-// ─── Venue phone number lookup ─────────────────────────────────────────────
-
-async function lookupVenuePhone(venueName: string): Promise<string | null> {
-  // TODO: Replace with real database or Google Places API lookup
-  const HARDCODED_VENUES: Record<string, string> = {
-    "pizza east": "+442071234567", // Example
-    "test": process.env.TEST_PHONE_NUMBER || "+447123456789", // For local testing
-  };
-
-  const normalized = venueName.toLowerCase().trim();
-  return HARDCODED_VENUES[normalized] || null;
 }
